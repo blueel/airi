@@ -82,6 +82,10 @@ export const ollamaProxy: Record<string, ProxyOptions> = {
   '/ollama': {
     target: 'http://127.0.0.1:11434',
     changeOrigin: true,
+    // Ollama allows only the origins in OLLAMA_ORIGINS. A public preview origin is not one of them, and Ollama
+    // answers 403 before the request reaches the model. The proxy is the only client here, so it presents the
+    // loopback origin that the default allowlist already contains.
+    headers: { origin: 'http://127.0.0.1:11434' },
     rewrite: path => path.replace(/^\/ollama/, ''),
   },
 }
