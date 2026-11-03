@@ -1027,6 +1027,26 @@ pages:
       description: 长期记忆
       enable: 使用长期记忆
       enable-description: 角色会记住聊过的事。关掉后，它什么都不记得。
+      auto:
+        label: 自动记忆
+        description: 聊几轮后，角色会在后台保存长期有用的事。每次会多请求一次模型。
+      model:
+        description: 两项都留空时跟随角色卡的聊天模型。建议填一个小本地模型，降低额外开销，也不和聊天抢显存。
+        provider: 服务商 ID
+        model: 模型 ID
+      server:
+        label: 使用记忆服务器
+        description: 把记忆存在电脑上，手机和电脑看到同一份数据。
+        url: 服务地址
+        url_description: 例如 http://127.0.0.1:4319。这个地址要让每台设备都能访问。
+        token: 访问令牌
+        token_description: 和服务端的 MEMORY_TOKEN 保持一致。
+        test: 测试连接
+        connected: 连接成功，服务端可用。
+        failed: 连不上记忆服务。
+        import: 导入本机记忆
+        imported: 已导入 {count} 条记忆。
+        import_empty: 本机没有可导入的记忆。
       memories:
         title: 记忆
         description: 这是每个角色自己记下的小秘密，彼此看不到。共享后所有角色都会知道，而且收不回来哦。你可以删掉任何一条，但不能改写。
@@ -1034,6 +1054,17 @@ pages:
         forget: '忘掉{name}'
         make_general: '把{name}共享给所有角色'
         general: 共享的秘密
+        kind:
+          profile: 用户画像
+          fact: 事实
+          episode: 情景
+        pinned: 已置顶
+        pin: 置顶
+        unpin: 取消置顶
+        edit: 编辑
+        save: 保存
+        cancel: 取消
+        description_label: 简短描述
         entry:
           title: 记忆
           description: 每个角色的小秘密，和大家共享的秘密。

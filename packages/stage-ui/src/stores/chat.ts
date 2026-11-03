@@ -39,7 +39,7 @@ import {
 import { getSpeechBusContext, voiceGenerationEnded } from '../services/speech/bus'
 import { composeDrawCardPrompt, createDrawCardTool, DRAW_CARD_TOOL_NAME, drawCardContent } from '../tools/draw-card'
 import { createJudgeRecipeTool, judgmentSkillText } from '../tools/judge-recipe'
-import { composeMemoryPrompt, createMemoryTools } from '../tools/memory'
+import { composeMemoryPrompt, composeRetrievedMemoryPrompt, createMemoryTools } from '../tools/memory'
 import { createProposeRecipeTool } from '../tools/propose-recipe'
 import { createSearchIconsTool } from '../tools/search-icons'
 import { createUseRecipeTool } from '../tools/use-recipe'
@@ -58,6 +58,7 @@ import { useChatSessionStore } from './chat/session-store'
 import { useChatStreamStore } from './chat/stream-store'
 import { useContextObservabilityStore } from './devtools/context-observability'
 import { useMemoryStore } from './memory'
+import { useMemoryFormationStore } from './memory-formation'
 import { useAiriCardStore } from './modules/airi-card'
 import { useAutonomousArtistryStore } from './modules/artistry-autonomous'
 import { useConsciousnessStore } from './modules/consciousness'
@@ -284,6 +285,7 @@ export const useChatStore = defineStore('chat', () => {
   const cardStore = useAiriCardStore()
   const recipes = useRecipesStore()
   const memory = useMemoryStore()
+  const memoryFormation = useMemoryFormationStore()
 
   /** The persona of a session. A session without one uses the selected card. */
   function personaOf(sessionId: string) {
@@ -298,7 +300,7 @@ export const useChatStore = defineStore('chat', () => {
   function sessionSystemPrompt(sessionId: string) {
     const persona = personaOf(sessionId)
     const identity = composeSystemPrompt(cardStore.getSystemPrompt(persona))
-      + (memory.enabled ? composeMemoryPrompt(memory.indexFor(persona)) : '')
+      + (memory.enabled ? composeMemoryPrompt(memory.coreIndexFor(persona), memory.profileFor(persona)) : '')
       + (drawsCards(sessionId) ? composeDrawCardPrompt() : '')
     const recipeId = chatSession.sessionMetas[sessionId]?.recipeId
     const recipe = recipeId ? recipes.recipes.find(entry => entry.id === recipeId) : undefined
@@ -638,7 +640,7 @@ export const useChatStore = defineStore('chat', () => {
     const persona = personaOf(sessionId)
     const sourceTools = async () => [
       ...(typeof tools === 'function' ? await tools() ?? [] : tools ?? []),
-      ...memory.enabled ? await createMemoryTools({ read: id => memory.read(id, persona), write: entry => memory.write(entry, persona), forget: id => memory.forget(id, persona) }) : [],
+      ...memory.enabled ? await createMemoryTools({ read: id => memory.read(id, persona), write: entry => memory.write(entry, persona), forget: id => memory.forget(id, persona), search: (query, limit) => memory.retrieve(query, persona, limit) }) : [],
     ]
     // A recipe's own session runs only that recipe. It cannot start recipes, save them, or choose silence.
     if (isTaskSession(sessionId))
@@ -1144,6 +1146,25 @@ export const useChatStore = defineStore('chat', () => {
       const artistry = sessionCard(sessionId)?.extensions?.airi?.modules?.artistry
       if (artistry?.autonomousEnabled && artistry?.autonomousTarget === 'assistant')
         void artistryAutonomousStore.runArtistTask(messageText, toProviderHistory(sessionMessages))
+
+      if (!memory.enabled || !memory.autoFormation)
+        return
+      const characterId = chatSession.sessionMetas[sessionId]?.characterId
+      if (!characterId)
+        return
+      const selection = cardStore.getModules(characterId).consciousness
+      if (!selection.provider || !selection.model)
+        return
+      const dedicatedProvider = memory.formationProvider.trim()
+      const dedicatedModel = memory.formationModel.trim()
+      const useDedicated = Boolean(dedicatedProvider && dedicatedModel)
+      void memoryFormation.afterTurn({
+        sessionId,
+        persona: personaOf(sessionId),
+        providerId: useDedicated ? dedicatedProvider : selection.provider,
+        model: useDedicated ? dedicatedModel : selection.model,
+        messages: chatSession.getSessionMessages(sessionId),
+      })
     },
   })
 
@@ -1286,6 +1307,11 @@ export const useChatStore = defineStore('chat', () => {
 
     signal.throwIfAborted()
 
+    // Start retrieval while the provider and stickers resolve. A slow memory server must not delay the reply.
+    const memoryRetrieval = memory.enabled
+      ? memory.retrieve(payload.text, personaOf(payload.sessionId), 8, { timeoutMs: 150 })
+      : Promise.resolve([])
+
     // Typed and voice turns use the character that owns the session, not the selected card.
     // Selecting another card while this turn waits in the queue cannot redirect it.
     const characterId = chatSession.sessionMetas[payload.sessionId]?.characterId
@@ -1304,6 +1330,10 @@ export const useChatStore = defineStore('chat', () => {
 
     if (controlEvents?.length)
       supplements.push(`Runtime control events for this conversation. These are control records, not user messages. Rendered audio positions are estimates: ${JSON.stringify(controlEvents)}`)
+
+    const memorySupplement = composeRetrievedMemoryPrompt(await memoryRetrieval)
+    if (memorySupplement)
+      supplements.push(memorySupplement)
 
     const systemPromptSupplement = supplements.filter(Boolean).join('\n\n')
 

@@ -2,6 +2,7 @@ import type { MemoryEntry, MemoryWrite } from '../../types/memory'
 
 import localforage from 'localforage'
 
+import { scoreMemoryCandidates } from '@proj-airi/stage-shared/memory-search'
 import { v7 as uuidv7 } from 'uuid'
 
 /** A removed entry stays as a tombstone with the time of the removal, so a later sync can remove it on other devices. */
@@ -14,6 +15,46 @@ interface MemoryTombstone {
 type StoredMemory = MemoryEntry | MemoryTombstone
 
 const records = localforage.createInstance({ name: 'airi-memory', storeName: 'entries' })
+
+interface RemoteMemoryConfig {
+  url: string
+  token?: string
+}
+
+let remoteConfig: RemoteMemoryConfig | undefined
+
+/** Switches the repository between the browser store and a remote memory server. */
+export function configureMemoryRepository(config: { mode: 'local' | 'remote', url?: string, token?: string }) {
+  const url = config.url?.trim()
+  remoteConfig = config.mode === 'remote' && url
+    ? { url: url.replace(/\/+$/, ''), ...(config.token?.trim() ? { token: config.token.trim() } : {}) }
+    : undefined
+}
+
+export function isRemoteMemoryRepository() {
+  return Boolean(remoteConfig)
+}
+
+async function remoteRequest<T>(path: string, init: RequestInit = {}, timeoutMs = 8_000): Promise<T> {
+  const config = remoteConfig
+  if (!config)
+    throw new Error('Memory server is not configured')
+
+  const response = await fetch(`${config.url}${path}`, {
+    ...init,
+    headers: {
+      'content-type': 'application/json',
+      ...(config.token ? { authorization: `Bearer ${config.token}` } : {}),
+      ...init.headers,
+    },
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(`Memory server responded ${response.status}${detail ? `: ${detail}` : ''}`)
+  }
+  return await response.json() as T
+}
 
 /**
  * Runs one write. Every write of every window takes this lock, so a write that reads the stored records sees every
@@ -30,7 +71,7 @@ async function storedEntry(id: string) {
 }
 
 /** Long-term memory on this device, one record for each entry, keyed by the entry id. */
-export const memoryRepo = {
+export const localMemoryRepo = {
   /** The entries that are not removed, oldest change first. */
   async list() {
     const entries: MemoryEntry[] = []
@@ -58,8 +99,27 @@ export const memoryRepo = {
         body: input.body,
         persona,
         updatedAt,
+        ...(input.kind ? { kind: input.kind } : {}),
+        ...(input.importance !== undefined ? { importance: input.importance } : {}),
+        ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
+        ...(input.source ? { source: input.source } : {}),
+        ...(input.sourceSessionId ? { sourceSessionId: input.sourceSessionId } : {}),
+        ...(own?.createdAt !== undefined ? { createdAt: own.createdAt } : { createdAt: updatedAt }),
+        ...(own?.lastUsedAt !== undefined ? { lastUsedAt: own.lastUsedAt } : {}),
+        ...(own?.useCount !== undefined ? { useCount: own.useCount } : {}),
       }
       await records.setItem<MemoryEntry>(entry.id, entry)
+      return entry
+    })
+  },
+  /** Changes any stored entry. Only the owner uses it, in Settings. */
+  async update(id: string, fields: Partial<Omit<MemoryEntry, 'id'>>, updatedAt: number) {
+    return write(async () => {
+      const stored = await storedEntry(id)
+      if (!stored)
+        return undefined
+      const entry: MemoryEntry = { ...stored, ...fields, id, updatedAt }
+      await records.setItem<MemoryEntry>(id, entry)
       return entry
     })
   },
@@ -93,5 +153,176 @@ export const memoryRepo = {
   /** Deletes every record, tombstones too. Only deleting all data uses it. */
   async clear() {
     await write(() => records.clear())
+  },
+  /** Ranks the local entries with the same scorer as the memory server. */
+  async search(query: string, persona: string, limit = 8) {
+    const entries = (await this.list()).filter(entry => !entry.persona || entry.persona === persona)
+    return scoreMemoryCandidates(entries, query, { limit }).map(item => item.memory)
+  },
+}
+
+/** Long-term memory on the memory server, shared by every device. */
+const remoteMemoryRepo = {
+  async list() {
+    const pageSize = 1_000
+    const entries: MemoryEntry[] = []
+    let offset = 0
+    while (true) {
+      const page = await remoteRequest<{ entries: MemoryEntry[], total: number }>(
+        `/memory?limit=${pageSize}&offset=${offset}`,
+        {},
+        3_000,
+      )
+      entries.push(...page.entries)
+      offset += page.entries.length
+      if (page.entries.length === 0 || page.entries.length < pageSize || entries.length >= page.total)
+        return entries
+    }
+  },
+  async import(entries: MemoryEntry[]) {
+    return await remoteRequest<{ imported: number }>('/memory/import', {
+      method: 'POST',
+      body: JSON.stringify({ entries }),
+    })
+  },
+  async write(input: MemoryWrite, persona: string) {
+    const result = await remoteRequest<{ entry: MemoryEntry }>('/memory', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: input.id,
+        persona,
+        kind: input.kind,
+        description: input.description,
+        body: input.body,
+        importance: input.importance,
+        pinned: input.pinned,
+        source: input.source,
+        sourceSessionId: input.sourceSessionId,
+      }),
+    })
+    return result.entry
+  },
+  async update(id: string, fields: Partial<Omit<MemoryEntry, 'id'>>) {
+    const result = await remoteRequest<{ entry: MemoryEntry }>(`/memory/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(fields),
+    })
+    return result.entry
+  },
+  async makeGeneral(id: string) {
+    const result = await remoteRequest<{ changed: boolean }>(`/memory/${encodeURIComponent(id)}/make-general`, { method: 'POST' })
+    return result.changed
+  },
+  async forget(id: string, persona: string) {
+    const result = await remoteRequest<{ forgotten: boolean }>('/memory/forget', {
+      method: 'POST',
+      body: JSON.stringify({ id, persona }),
+    })
+    return result.forgotten
+  },
+  async remove(ids: string[]) {
+    await remoteRequest('/memory/remove', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    })
+  },
+  async clear() {
+    await remoteRequest('/memory/clear', { method: 'POST' })
+  },
+  async search(query: string, persona: string, limit = 8) {
+    const result = await remoteRequest<{ entries: MemoryEntry[] }>('/memory/search', {
+      method: 'POST',
+      body: JSON.stringify({ query, persona, limit }),
+    }, 1_500)
+    return result.entries
+  },
+  async health() {
+    const result = await remoteRequest<{ ok: boolean }>('/health', {}, 3_000)
+    return result.ok
+  },
+  async exportAll() {
+    return await remoteRequest<{ format: string, exportedAt: number, memories: MemoryEntry[] }>('/memory/export')
+  },
+}
+
+/** The repository the memory store uses. Remote mode keeps every device on one database. */
+export const memoryRepo = {
+  configure: configureMemoryRepository,
+  isRemote: isRemoteMemoryRepository,
+  async list() {
+    return remoteConfig ? remoteMemoryRepo.list() : localMemoryRepo.list()
+  },
+  async add(entries: MemoryEntry[]) {
+    if (remoteConfig)
+      return await remoteMemoryRepo.import(entries)
+    return await localMemoryRepo.add(entries)
+  },
+  async write(input: MemoryWrite, persona: string, updatedAt: number) {
+    return remoteConfig
+      ? await remoteMemoryRepo.write(input, persona)
+      : await localMemoryRepo.write(input, persona, updatedAt)
+  },
+  async update(id: string, fields: Partial<Omit<MemoryEntry, 'id'>>, updatedAt: number) {
+    return remoteConfig
+      ? await remoteMemoryRepo.update(id, fields)
+      : await localMemoryRepo.update(id, fields, updatedAt)
+  },
+  async makeGeneral(id: string, updatedAt: number) {
+    return remoteConfig
+      ? await remoteMemoryRepo.makeGeneral(id)
+      : await localMemoryRepo.makeGeneral(id, updatedAt)
+  },
+  async forget(id: string, persona: string, updatedAt: number) {
+    return remoteConfig
+      ? await remoteMemoryRepo.forget(id, persona)
+      : await localMemoryRepo.forget(id, persona, updatedAt)
+  },
+  async remove(ids: string[], updatedAt: number) {
+    if (remoteConfig)
+      return await remoteMemoryRepo.remove(ids)
+    return await localMemoryRepo.remove(ids, updatedAt)
+  },
+  async clear() {
+    if (remoteConfig)
+      return await remoteMemoryRepo.clear()
+    return await localMemoryRepo.clear()
+  },
+  async search(query: string, persona: string, limit = 8) {
+    return remoteConfig
+      ? await remoteMemoryRepo.search(query, persona, limit)
+      : await localMemoryRepo.search(query, persona, limit)
+  },
+  async listLocal() {
+    return await localMemoryRepo.list()
+  },
+  async importLocal(entries: MemoryEntry[]) {
+    return await remoteMemoryRepo.import(entries)
+  },
+  async migrateLocalToRemote() {
+    const entries = await localMemoryRepo.list()
+    if (!entries.length)
+      return 0
+    const result = await remoteMemoryRepo.import(entries)
+    return result.imported
+  },
+  async health() {
+    if (!remoteConfig)
+      return true
+    return await remoteMemoryRepo.health()
+  },
+  async exportAll() {
+    if (remoteConfig)
+      return await remoteMemoryRepo.exportAll()
+    return {
+      format: 'airi-memory-export:v1',
+      exportedAt: Date.now(),
+      memories: await localMemoryRepo.list(),
+    }
+  },
+  async importAll(entries: MemoryEntry[]) {
+    if (remoteConfig)
+      return await remoteMemoryRepo.import(entries)
+    await localMemoryRepo.add(entries)
+    return entries.length
   },
 }

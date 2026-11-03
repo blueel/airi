@@ -21,6 +21,8 @@
     "./beat-sync": "./src/beat-sync/index.ts",
     "./global-shortcut": "./src/global-shortcut/index.ts",
     "./godot-stage": "./src/godot-stage/index.ts",
+    "./memory-search": "./src/memory-search.ts",
+    "./memory-secret": "./src/memory-secret.ts",
     "./model-assets": "./src/model-assets/index.ts",
     "./plugin-host": "./src/plugin-host.ts",
     "./screen-ambient-light": "./src/screen-ambient-light/index.ts",

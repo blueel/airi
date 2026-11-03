@@ -2,19 +2,20 @@ import type { MemoryEntry, MemoryWrite } from '../types/memory'
 
 import { errorMessageFrom } from '@moeru/std'
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
+import { scoreMemoryCandidates, tokenizeMemoryText } from '@proj-airi/stage-shared/memory-search'
 import { useBroadcastChannel } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { v7 as uuidv7 } from 'uuid'
 import { computed, ref, watch } from 'vue'
 
-import { memoryRepo } from '../database/repos/memory.repo'
+import { localMemoryRepo, memoryRepo } from '../database/repos/memory.repo'
 
 const LEGACY_ENTRIES_STORAGE_KEY = 'memory/entries'
+const REMOTE_MIGRATED_KEY = 'memory/remote-migrated'
 
 // NOTICE:
-// Up to v0.13.1 the entries were in localStorage under `memory/entries`, keyed by a name that the model chose.
-// localStorage holds a few megabytes, and two facts could share a name. IndexedDB keeps the entries now, with store-made ids.
-// Move them once. The lock keeps two windows that start together from moving them twice.
+// v0.13.1 stored entries in localStorage, keyed by a model-chosen name.
+// IndexedDB now keeps them with generated ids. Move them once; the lock stops two windows from moving them twice.
 // Removal condition: two releases after the release that moves them.
 async function moveLegacyEntries() {
   if (!globalThis.localStorage?.getItem(LEGACY_ENTRIES_STORAGE_KEY))
@@ -24,14 +25,15 @@ async function moveLegacyEntries() {
     if (!stored)
       return
     const legacy: (Omit<MemoryEntry, 'id'> & { name: string })[] = JSON.parse(stored)
-    await memoryRepo.add(legacy.map(({ description, body, persona, updatedAt }) => ({ id: uuidv7(), description, body, persona, updatedAt })))
+    await localMemoryRepo.add(legacy.map(({ description, body, persona, updatedAt }) => ({ id: uuidv7(), description, body, persona, updatedAt })))
     localStorage.removeItem(LEGACY_ENTRIES_STORAGE_KEY)
   })
 }
 
 /**
  * Long-term memory as a small index and one entry per fact, kept by the character itself.
- * IndexedDB keeps the entries. After each change, the other windows read them again.
+ * IndexedDB keeps the entries by default. A memory server keeps them for every device when one is configured.
+ * After each change, the other windows read them again.
  *
  * Use when:
  * - A run reads the index or an entry, writes or forgets a fact, or Settings lists the memories by card.
@@ -45,14 +47,41 @@ async function moveLegacyEntries() {
  */
 export const useMemoryStore = defineStore('memory', () => {
   const enabled = useLocalStorageManualReset<boolean>('memory/enabled', true)
+  const autoFormation = useLocalStorageManualReset<boolean>('memory/auto-formation', true)
+  const backend = useLocalStorageManualReset<'local' | 'remote'>('memory/backend', 'local')
+  const serverUrl = useLocalStorageManualReset<string>('memory/server-url', '/api/memory')
+  const serverToken = useLocalStorageManualReset<string>('memory/server-token', '')
+  const formationProvider = useLocalStorageManualReset<string>('memory/formation-provider', '')
+  const formationModel = useLocalStorageManualReset<string>('memory/formation-model', '')
   const entries = ref<MemoryEntry[]>([])
   const { data: changed, post } = useBroadcastChannel<string[], string[]>({ name: 'airi:memory' })
+
+  function applyBackend() {
+    memoryRepo.configure({ mode: backend.value, url: serverUrl.value, token: serverToken.value })
+  }
+  applyBackend()
+
   let pendingLoad = moveLegacyEntries()
     .catch(error => console.warn('[memory] Failed to move the entries from localStorage:', errorMessageFrom(error)))
 
   /** Reads the entries again, after the reads that started before. */
   function load() {
     pendingLoad = pendingLoad.catch(() => {}).then(async () => {
+      if (memoryRepo.isRemote()) {
+        const remote = await memoryRepo.list()
+        const migrated = localStorage.getItem(REMOTE_MIGRATED_KEY) === 'true'
+        if (!remote.length && !migrated) {
+          const local = await memoryRepo.listLocal()
+          if (local.length) {
+            await memoryRepo.importLocal(local)
+            localStorage.setItem(REMOTE_MIGRATED_KEY, 'true')
+            entries.value = await memoryRepo.list()
+            return
+          }
+        }
+        entries.value = remote
+        return
+      }
       entries.value = await memoryRepo.list()
     })
     return pendingLoad
@@ -77,13 +106,30 @@ export const useMemoryStore = defineStore('memory', () => {
    * A run reads it when it starts, from the entries that the window read last.
    */
   function indexFor(personaId: string) {
-    const line = (entry: MemoryEntry) => `- ${entry.id}: ${entry.description}`
-    const own = entries.value.filter(entry => entry.persona === personaId).map(line)
-    const general = entries.value.filter(entry => !entry.persona).map(line)
-    return [
-      ...(own.length ? [`Your own:\n${own.join('\n')}`] : []),
-      ...(general.length ? [`General:\n${general.join('\n')}`] : []),
-    ].join('\n')
+    return formatIndex(entries.value.filter(entry => entry.kind !== 'profile'), personaId)
+  }
+
+  /** A smaller index for the stable system prompt: pinned entries and the most important recent ones. */
+  function coreIndexFor(personaId: string) {
+    const visible = entries.value
+      .filter(entry => entry.kind !== 'profile' && (!entry.persona || entry.persona === personaId))
+      .sort((left, right) => {
+        const pinned = Number(Boolean(right.pinned)) - Number(Boolean(left.pinned))
+        if (pinned !== 0)
+          return pinned
+        const importance = (right.importance ?? 3) - (left.importance ?? 3)
+        if (importance !== 0)
+          return importance
+        return right.updatedAt - left.updatedAt
+      })
+      .slice(0, 12)
+    return formatIndex(visible, personaId)
+  }
+
+  /** The user profile that the extraction pass keeps. */
+  function profileFor(personaId: string) {
+    return entries.value.find(entry => entry.kind === 'profile' && entry.persona === personaId)
+      ?? entries.value.find(entry => entry.kind === 'profile' && !entry.persona)
   }
 
   /** Reads an entry that the persona can see by its id: one of its own, or a general one. */
@@ -99,8 +145,23 @@ export const useMemoryStore = defineStore('memory', () => {
     const body = input.body.trim()
     if (!body)
       return undefined
-    const entry = await memoryRepo.write({ id: input.id, description: input.description.trim(), body }, personaId, Date.now())
+    // The background pass can see the same fact twice. Reuse the closest own entry instead of growing duplicates.
+    const id = input.id ?? (input.source === 'auto' ? duplicateIdOf(entries.value, input, personaId) : undefined)
+    const entry = await memoryRepo.write({
+      ...input,
+      id,
+      description: input.description.trim(),
+      body,
+    }, personaId, Date.now())
     await publish([entry.id])
+    return entry
+  }
+
+  /** Changes any entry. Only the owner uses it, in Settings. */
+  async function update(id: string, fields: Partial<Omit<MemoryEntry, 'id'>>) {
+    const entry = await memoryRepo.update(id, fields, Date.now())
+    if (entry)
+      await publish([entry.id])
     return entry
   }
 
@@ -124,8 +185,76 @@ export const useMemoryStore = defineStore('memory', () => {
     return true
   }
 
+  /**
+   * Reads the memories that matter for this message. Local mode ranks the entries already in memory, so it never
+   * waits on IndexedDB. A remote server ranks them; `timeoutMs` lets a chat stop waiting and send without memory.
+   */
+  async function retrieve(query: string, personaId: string, limit = 8, options: { timeoutMs?: number } = {}) {
+    if (!enabled.value || !query.trim())
+      return []
+
+    const local = () => {
+      const visible = entries.value
+        .filter(entry => entry.kind !== 'profile' && (!entry.persona || entry.persona === personaId))
+      return scoreMemoryCandidates(visible, query, { limit }).map(item => item.memory)
+    }
+
+    const run = (async () => {
+      if (!memoryRepo.isRemote())
+        return local()
+      try {
+        return await memoryRepo.search(query, personaId, limit)
+      }
+      catch (error) {
+        // A server that is down or slow must not keep the chat waiting. Fall back to the entries this window already has.
+        if ((error as { name?: string }).name !== 'AbortError')
+          console.warn('[memory] Failed to read from the memory server, using the local entries:', errorMessageFrom(error))
+        return local()
+      }
+    })()
+
+    if (!options.timeoutMs)
+      return await run
+
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<MemoryEntry[]>((resolve) => {
+      timer = setTimeout(resolve, options.timeoutMs, [])
+    })
+    try {
+      return await Promise.race([run, timeout])
+    }
+    finally {
+      if (timer)
+        clearTimeout(timer)
+    }
+  }
+
+  /** Checks that the configured memory server answers. */
+  async function testConnection() {
+    try {
+      return await memoryRepo.health()
+    }
+    catch {
+      return false
+    }
+  }
+
+  /** Copies this browser's memories to the configured server. Resolves to the number of entries sent. */
+  async function migrateLocalToRemote() {
+    const count = await memoryRepo.migrateLocalToRemote()
+    if (count > 0) {
+      localStorage.setItem(REMOTE_MIGRATED_KEY, 'true')
+      await publish([])
+    }
+    return count
+  }
+
   async function resetState() {
     enabled.reset()
+    autoFormation.reset()
+    formationProvider.reset()
+    formationModel.reset()
+    localStorage.removeItem(REMOTE_MIGRATED_KEY)
     await memoryRepo.clear()
     await publish([])
   }
@@ -133,19 +262,79 @@ export const useMemoryStore = defineStore('memory', () => {
   function reload() {
     void load().catch(error => console.warn('[memory] Failed to read the entries:', errorMessageFrom(error)))
   }
+
+  watch([backend, serverUrl, serverToken], () => {
+    applyBackend()
+    reload()
+  })
   watch(changed, reload)
   reload()
 
   return {
     enabled,
+    autoFormation,
+    backend,
+    serverUrl,
+    serverToken,
+    formationProvider,
+    formationModel,
     entries: computed(() => entries.value),
     ready,
     indexFor,
+    coreIndexFor,
+    profileFor,
     read,
     write,
+    update,
     makeGeneral,
     forget,
     remove,
+    retrieve,
+    testConnection,
+    migrateLocalToRemote,
     resetState,
   }
 })
+
+function formatIndex(entries: readonly MemoryEntry[], personaId: string, includeGeneral = true) {
+  const line = (entry: MemoryEntry) => `- ${entry.id}: ${entry.description}`
+  const own = entries.filter(entry => entry.persona === personaId).map(line)
+  const general = includeGeneral ? entries.filter(entry => !entry.persona).map(line) : []
+  return [
+    ...(own.length ? [`Your own:\n${own.join('\n')}`] : []),
+    ...(general.length ? [`General:\n${general.join('\n')}`] : []),
+  ].join('\n')
+}
+
+function normalizedText(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function jaccard(left: readonly string[], right: readonly string[]) {
+  if (left.length === 0 || right.length === 0)
+    return 0
+  const leftSet = new Set(left)
+  const rightSet = new Set(right)
+  let intersection = 0
+  for (const token of leftSet) {
+    if (rightSet.has(token))
+      intersection++
+  }
+  return intersection / (leftSet.size + rightSet.size - intersection)
+}
+
+/** The own entry that an automatic write repeats, so the background pass updates instead of appending. */
+function duplicateIdOf(entries: readonly MemoryEntry[], input: MemoryWrite, personaId: string) {
+  const kind = input.kind ?? 'fact'
+  const description = normalizedText(input.description)
+  const tokens = tokenizeMemoryText(`${input.description}\n${input.body}`)
+  for (const entry of entries) {
+    if (entry.persona !== personaId || (entry.kind ?? 'fact') !== kind)
+      continue
+    if (description && normalizedText(entry.description) === description)
+      return entry.id
+    if (jaccard(tokens, tokenizeMemoryText(`${entry.description}\n${entry.body}`)) >= 0.9)
+      return entry.id
+  }
+  return undefined
+}

@@ -86,6 +86,20 @@ export const ollamaProxy: Record<string, ProxyOptions> = {
   },
 }
 
+/**
+ * Forwards the local memory service through whichever origin serves the app.
+ * A page opened over HTTPS cannot call the plain HTTP loopback port, and a
+ * phone cannot reach the computer's loopback at all. The default client address
+ * is `/api/memory`, so the same value works in dev, preview, and on a phone.
+ */
+export const memoryProxy: Record<string, ProxyOptions> = {
+  '/api/memory': {
+    target: 'http://127.0.0.1:4319',
+    changeOrigin: true,
+    rewrite: path => path.replace(/^\/api\/memory/, ''),
+  },
+}
+
 export default defineConfig({
   optimizeDeps: {
     exclude: [
@@ -125,7 +139,7 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: { ...breezeTtsProxy, ...ollamaProxy },
+    proxy: { ...breezeTtsProxy, ...ollamaProxy, ...memoryProxy },
     fs: {
       // To mute errors like:
       //   The request id ".../node_modules/@fontsource/sniglet/files/sniglet-latin-400-normal.woff" is outside of Vite serving allow list.
