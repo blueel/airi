@@ -17,6 +17,7 @@ import { errorMessageFrom } from '@moeru/std'
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { inspectLive2DModelControls } from '@proj-airi/stage-ui-live2d/controls/manifest'
 import { isLive2DControlEnabled } from '@proj-airi/stage-ui-live2d/controls/policy'
+import { fetchLive2DArchive } from '@proj-airi/stage-ui-live2d/utils/model-archive-cache'
 import { StorageSerializers, useDocumentVisibility, watchDebounced } from '@vueuse/core'
 import { isEqual } from 'es-toolkit'
 import { nanoid } from 'nanoid'
@@ -114,6 +115,69 @@ const emptyLive2DExpressions: readonly Live2DExpressionControl[] = Object.freeze
 const emptyLive2DMotions: readonly Live2DMotionControl[] = Object.freeze([])
 const emptyLive2DModelControls: Live2DModelControls = { expressions: [], motions: [] }
 const emptyCharacterModules: ReadonlyMap<string, CardModuleDefaults> = new Map()
+
+/**
+ * Inspecting a Live2D archive means downloading the whole zip. The Stage loads
+ * the same archive for rendering, and startup can resolve the active card more
+ * than once, so without this every visit reads the model two or three times.
+ *
+ * Content hashes are part of the URL, so a cached inspection never describes a
+ * different archive. Key by URL, not by model id, for that reason.
+ */
+const live2DControlsCachePrefix = 'airi:live2d-controls:v1:'
+const live2DControlsCacheLimit = 12
+const pendingLive2DControlInspections = new Map<string, Promise<Live2DModelControls>>()
+
+function readCachedLive2DModelControls(key: string): Live2DModelControls | undefined {
+  try {
+    const raw = globalThis.localStorage?.getItem(live2DControlsCachePrefix + key)
+    if (!raw)
+      return undefined
+
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object')
+      return undefined
+
+    const controls = parsed as Live2DModelControls
+    if (!Array.isArray(controls.expressions) || !Array.isArray(controls.motions))
+      return undefined
+
+    return controls
+  }
+  catch {
+    return undefined
+  }
+}
+
+function pruneLive2DControlsCache(keepKey: string) {
+  try {
+    const staleKeys: string[] = []
+    for (let i = 0; i < (globalThis.localStorage?.length ?? 0); i++) {
+      const key = globalThis.localStorage?.key(i)
+      const cachedKey = key?.startsWith(live2DControlsCachePrefix) ? key.slice(live2DControlsCachePrefix.length) : undefined
+      if (cachedKey && cachedKey !== keepKey)
+        staleKeys.push(key!)
+    }
+    // Iteration order follows insertion order in current browsers, so the head
+    // holds the least recently written entries.
+    const overflow = staleKeys.length - (live2DControlsCacheLimit - 1)
+    for (const key of staleKeys.slice(0, Math.max(0, overflow)))
+      globalThis.localStorage?.removeItem(key)
+  }
+  catch {
+    // Pruning is best effort; a full cache is still correct, just larger.
+  }
+}
+
+function writeCachedLive2DModelControls(key: string, controls: Live2DModelControls) {
+  try {
+    pruneLive2DControlsCache(key)
+    globalThis.localStorage?.setItem(live2DControlsCachePrefix + key, JSON.stringify(controls))
+  }
+  catch {
+    // A full quota only costs one extra download on the next visit.
+  }
+}
 
 /**
  * Returns the Display Model ID that a card stored before Avatar Models existed.
@@ -1414,18 +1478,41 @@ export const useAiriCardStore = defineStore('airi-card', () => {
       if (!displayModel || generation !== live2DControlLoadGeneration)
         return
 
-      let archive: Blob
-      if (displayModel.type === 'file') {
-        archive = displayModel.file
-      }
-      else {
-        const response = await fetch(displayModel.url)
-        if (!response.ok)
-          throw new Error(`Failed to load the Live2D archive (${response.status} ${response.statusText}).`)
-        archive = await response.blob()
+      const cacheKey = displayModel.type === 'file' ? undefined : displayModel.url
+      if (cacheKey) {
+        const cached = readCachedLive2DModelControls(cacheKey)
+        if (cached) {
+          if (generation === live2DControlLoadGeneration)
+            activeLive2DModelControls.value = cached
+          return
+        }
       }
 
-      const controls = await inspectLive2DModelControls(archive)
+      let inspection = cacheKey ? pendingLive2DControlInspections.get(cacheKey) : undefined
+      if (!inspection) {
+        const task = (async () => {
+          const archive = displayModel.type === 'file'
+            ? displayModel.file
+            : await fetchLive2DArchive(displayModel.url)
+
+          const controls = await inspectLive2DModelControls(archive)
+          if (cacheKey)
+            writeCachedLive2DModelControls(cacheKey, controls)
+          return controls
+        })()
+        inspection = task
+
+        if (cacheKey) {
+          pendingLive2DControlInspections.set(cacheKey, task)
+          const forget = () => {
+            if (pendingLive2DControlInspections.get(cacheKey) === task)
+              pendingLive2DControlInspections.delete(cacheKey)
+          }
+          void task.then(forget, forget)
+        }
+      }
+
+      const controls = await inspection
       if (generation === live2DControlLoadGeneration)
         activeLive2DModelControls.value = controls
     }

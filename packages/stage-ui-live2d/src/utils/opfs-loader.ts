@@ -3,6 +3,7 @@ import type { Live2DFactoryContext, Middleware } from 'pixi-live2d-display/cubis
 import JSZip from 'jszip'
 
 import { decodeZipFileName } from './decode-zip-filename'
+import { fetchLive2DArchive } from './model-archive-cache'
 
 interface OPFSContext extends Live2DFactoryContext {
   opfsKey?: string
@@ -260,10 +261,9 @@ export class OPFSCache {
     context.opfsUrl = blobUrl
 
     try {
-      const res = await fetch(blobUrl)
-      const blob = new Blob([await res.arrayBuffer()], {
-        type: res.headers.get('content-type') ?? '',
-      })
+      // Shares one download with the character-card inspector and reuses the
+      // Cache API copy on browsers where OPFS is unavailable.
+      const blob = await fetchLive2DArchive(blobUrl)
       const fileName = `${key}.zip`
       context.opfsZipBlob = blob
       context.source = [new File([blob], fileName)]
