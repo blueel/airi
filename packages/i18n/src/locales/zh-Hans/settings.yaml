@@ -1141,6 +1141,35 @@ pages:
           description: 你让角色建配方时，它会先存成提议，你批准后才生效。
         model_flow: 每次做什么由角色决定
       title: 长期记忆
+    emotion:
+      title: 情绪与主动性
+      description: 角色会保有自己的心情，并在你安静时主动开启话题。
+      state:
+        title: 当前状态
+        description: 消息和时间会改变心情，心情会自己回到平静的基准。
+        feeling: 心情
+        affection: 好感度
+        energy: 精力
+        feeling_values:
+          neutral: 平静
+          happy: 开心
+          sad: 难过
+          angry: 生气
+          surprised: 惊讶
+          relaxed: 放松
+          confused: 困惑
+          tired: 疲惫
+          affectionate: 亲昵
+          awkward: 尴尬
+      proactive:
+        label: 安静时主动开启话题
+        description: 长时间没有消息时，角色可以主动发一条短消息。这会多一次模型调用。
+        silence: 静默时长（分钟）
+        silence-description: 你安静多久后，角色可以主动开口。
+        cooldown: 冷却时间（分钟）
+        cooldown-description: 角色两次主动消息之间的最短间隔。
+        max-per-hour: 每小时消息数
+        max-per-hour-description: 角色一小时内主动开启话题的次数上限。
     memory-short-term:
       description: 短期记忆
       title: 短期记忆

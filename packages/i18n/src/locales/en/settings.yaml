@@ -1204,6 +1204,35 @@ pages:
           description: A recipe that you ask for is saved as a proposal. It works only after you approve it.
         model_flow: The character decides what each run does
       title: Long-Term Memory
+    emotion:
+      title: Emotion & Proactivity
+      description: The character keeps a mood and can start a topic when you are quiet.
+      state:
+        title: Current state
+        description: Messages and time change the mood. It returns to a calm baseline on its own.
+        feeling: Feeling
+        affection: Affection
+        energy: Energy
+        feeling_values:
+          neutral: Calm
+          happy: Happy
+          sad: Sad
+          angry: Angry
+          surprised: Surprised
+          relaxed: Relaxed
+          confused: Confused
+          tired: Tired
+          affectionate: Affectionate
+          awkward: Awkward
+      proactive:
+        label: Start a topic when quiet
+        description: After a long silence, the character may send one short message. This uses one model call.
+        silence: Silence (minutes)
+        silence-description: How long you must be quiet before the character can start a topic.
+        cooldown: Cooldown (minutes)
+        cooldown-description: The shortest time between two messages that the character starts.
+        max-per-hour: Messages per hour
+        max-per-hour-description: The character never starts more than this many topics in one hour.
     memory-short-term:
       description: Short-term memory specific settings and management
       title: Short-Term Memory

@@ -145,8 +145,8 @@ export const useMemoryStore = defineStore('memory', () => {
     const body = input.body.trim()
     if (!body)
       return undefined
-    // The background pass can see the same fact twice. Reuse the closest own entry instead of growing duplicates.
-    const id = input.id ?? (input.source === 'auto' ? duplicateIdOf(entries.value, input, personaId) : undefined)
+    // The background pass and a reflection can see the same fact twice. Reuse the closest own entry instead of growing duplicates.
+    const id = input.id ?? (input.source === 'auto' || input.source === 'reflection' ? duplicateIdOf(entries.value, input, personaId) : undefined)
     const entry = await memoryRepo.write({
       ...input,
       id,

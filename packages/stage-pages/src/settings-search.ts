@@ -31,6 +31,7 @@ export const settingsSearchModules: Readonly<Record<string, SettingsSearchModule
   'modules:stickers': () => import('./pages/settings/modules/stickers.search'),
   'modules:tool-cards': () => import('./pages/settings/modules/tool-cards.search'),
   'modules:memories': () => import('./pages/settings/modules/memory-long-term-memories.search'),
+  'modules:emotion': { routes: ['/settings/modules/emotion'] },
   'modules:recipes': () => import('./pages/settings/modules/memory-long-term-recipes.search'),
   'settings:providers': () => import('./pages/settings/providers/index.search'),
   'providers:comfyui': () => import('./pages/settings/providers/artistry/comfyui.search'),

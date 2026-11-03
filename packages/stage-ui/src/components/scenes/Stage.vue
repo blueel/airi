@@ -26,13 +26,13 @@ import { useBroadcastChannel, useEventListener } from '@vueuse/core'
 // import embedWorkerURL from '@xsai-transformers/embed/worker?worker&url'
 // import { embed } from '@xsai/embed'
 import { storeToRefs } from 'pinia'
-import { computed, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 
 import StageAvatarModelMissing from './stage-avatar-model-missing.vue'
 import StageRenderError from './stage-render-error.vue'
 
 // import { useDuckDb } from '../../composables/use-duck-db'
-import { Emotion, EMOTION_EmotionMotionName_value, EMOTION_VRMExpressionName_value, EmotionThinkMotionName } from '../../constants/emotions'
+import { Emotion, EMOTION_EmotionMotionName_value, EMOTION_VRMExpressionName_value, emotionPayloadFromLabel, EmotionThinkMotionName } from '../../constants/emotions'
 import { useLive2DStageMotionMagic } from '../../features/motions/live2d/use-live2d-stage-motion-magic'
 import { createAvatarTouchAggregator } from '../../libs/avatar-touch/notify'
 import { syncedRoles, usePiniaSynced } from '../../libs/pinia/synced-context'
@@ -45,6 +45,8 @@ import { useChatStore } from '../../stores/chat'
 import { useChatSessionStore } from '../../stores/chat/session-store'
 import { useSharedLive2DExpressionPreview } from '../../stores/live2d'
 import { useAiriCardStore } from '../../stores/modules/airi-card'
+import { useEmotionStateStore } from '../../stores/modules/emotion-state'
+import { useProactiveChatStore } from '../../stores/modules/proactive-chat'
 import { useSpeechStore } from '../../stores/modules/speech'
 import { useSettingsPresenceBubble } from '../../stores/presence-bubble'
 import { useSettings } from '../../stores/settings'
@@ -269,7 +271,7 @@ const emotionsQueue = createQueue<EmotionPayload>({
         if (!value)
           return
 
-        await vrmViewerRef.value!.setExpression(value, ctx.data.intensity)
+        await vrmViewerRef.value!.setExpression(value, ctx.data.intensity, ctx.data.durationMs)
       }
       else if (stageModelRenderer.value === 'live2d') {
         currentMotion.value = { group: EMOTION_EmotionMotionName_value[ctx.data.name] }
@@ -371,6 +373,33 @@ let disconnectLipSync: (() => void) | undefined
 let disconnectAnalyser: (() => void) | undefined
 
 const voice = useVoiceStore()
+const emotionState = useEmotionStateStore()
+const proactiveChat = useProactiveChatStore()
+
+// The persistent feeling shows itself when an event changes it, and again every 90 seconds while it lasts.
+// Speech keeps the floor, because its ACT markers already choose the expression. Generation alone does not,
+// so the mood shows as soon as the owner writes.
+watch(
+  () => [emotionState.displayRevision, emotionState.displayEmotion] as const,
+  ([, display]) => {
+    if (voice.activeTurns.length > 0)
+      return
+    if (display === 'neutral') {
+      emotionsQueue.enqueue({ name: Emotion.Neutral, intensity: 1 })
+      return
+    }
+    emotionsQueue.enqueue({
+      ...emotionPayloadFromLabel(display, Math.max(0.25, emotionState.displayIntensity)),
+      // A persistent mood holds the face, and the store refreshes it before this window ends.
+      durationMs: 120_000,
+    })
+  },
+)
+
+// A proactive message needs the Stage, since that is where the character speaks and the owner can see it.
+onMounted(() => proactiveChat.start())
+onUnmounted(() => proactiveChat.stop())
+
 const avatarTouch = useAvatarTouchStore()
 // A burst of touches on the avatar becomes one notification for the character.
 // The avatar already plays its own reaction, so a skipped notification still shows the touch.

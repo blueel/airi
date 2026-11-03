@@ -62,6 +62,8 @@ import { useMemoryFormationStore } from './memory-formation'
 import { useAiriCardStore } from './modules/airi-card'
 import { useAutonomousArtistryStore } from './modules/artistry-autonomous'
 import { useConsciousnessStore } from './modules/consciousness'
+import { useEmotionReflectionStore } from './modules/emotion-reflection'
+import { useEmotionStateStore } from './modules/emotion-state'
 import { useHearingStore } from './modules/hearing'
 import { useStickersStore } from './modules/stickers'
 import { useVisionStore } from './modules/vision'
@@ -286,6 +288,8 @@ export const useChatStore = defineStore('chat', () => {
   const recipes = useRecipesStore()
   const memory = useMemoryStore()
   const memoryFormation = useMemoryFormationStore()
+  const emotion = useEmotionStateStore()
+  const emotionReflection = useEmotionReflectionStore()
 
   /** The persona of a session. A session without one uses the selected card. */
   function personaOf(sessionId: string) {
@@ -423,12 +427,13 @@ export const useChatStore = defineStore('chat', () => {
    */
   async function notifyConversation(sessionId: string, notice: { source: string, text: string }) {
     if (!isOwnerSession(sessionId))
-      return
+      return undefined
     try {
-      await executeSend({ sessionId, text: notice.text }, { notice: { source: notice.source } })
+      return await executeSend({ sessionId, text: notice.text }, { notice: { source: notice.source } })
     }
     catch (error) {
       console.warn('[chat] Failed to deliver a notice:', errorMessageFrom(error))
+      return undefined
     }
   }
 
@@ -1094,6 +1099,14 @@ export const useChatStore = defineStore('chat', () => {
     onUserMessageAppended: ({ sessionId, message, messageText, source, model, provider, roundId, turnIndex }) => {
       if (isTaskSession(sessionId))
         return
+      // A notice is not owner speech, so it never changes the feeling.
+      if (!message.notice) {
+        emotion.ingest('message-received')
+        // A long conversation tires the character. The count is per 40 messages, so the event stays rare.
+        const messageCount = chatSession.getSessionMessages(sessionId).length
+        if (messageCount > 0 && messageCount % 40 === 0)
+          emotion.ingest('long-session')
+      }
       analyticsHooks.onUserMessageAppended?.({
         sessionId,
         message,
@@ -1115,6 +1128,9 @@ export const useChatStore = defineStore('chat', () => {
     },
     onAssistantMessageAppended: ({ sessionId, message, roundId }) => {
       const source = chatSession.getSessionMessages(sessionId).find(message => message.role === 'user' && message.id === roundId)
+      // A reply to a notice is the character talking to itself, so only an answer to the owner tires it.
+      if (!isTaskSession(sessionId) && source && !source.notice)
+        emotion.ingest('message-sent')
       if (source && isCloudSyncableMessage(source) && isCloudSyncableMessage(message) && message.id && syncsToCloud(sessionId)) {
         void chatSession.pushMessageToCloud(sessionId, {
           id: message.id,
@@ -1147,7 +1163,7 @@ export const useChatStore = defineStore('chat', () => {
       if (artistry?.autonomousEnabled && artistry?.autonomousTarget === 'assistant')
         void artistryAutonomousStore.runArtistTask(messageText, toProviderHistory(sessionMessages))
 
-      if (!memory.enabled || !memory.autoFormation)
+      if (!memory.enabled)
         return
       const characterId = chatSession.sessionMetas[sessionId]?.characterId
       if (!characterId)
@@ -1158,12 +1174,27 @@ export const useChatStore = defineStore('chat', () => {
       const dedicatedProvider = memory.formationProvider.trim()
       const dedicatedModel = memory.formationModel.trim()
       const useDedicated = Boolean(dedicatedProvider && dedicatedModel)
+      const providerId = useDedicated ? dedicatedProvider : selection.provider
+      const model = useDedicated ? dedicatedModel : selection.model
+      const messages = chatSession.getSessionMessages(sessionId)
+
+      // A reflection is independent from the per-turn formation, so a full ledger still gets its pass when that is off.
+      void emotionReflection.maybeReflect({
+        sessionId,
+        persona: personaOf(sessionId),
+        providerId,
+        model,
+        messages,
+      })
+
+      if (!memory.autoFormation)
+        return
       void memoryFormation.afterTurn({
         sessionId,
         persona: personaOf(sessionId),
-        providerId: useDedicated ? dedicatedProvider : selection.provider,
-        model: useDedicated ? dedicatedModel : selection.model,
-        messages: chatSession.getSessionMessages(sessionId),
+        providerId,
+        model,
+        messages,
       })
     },
   })

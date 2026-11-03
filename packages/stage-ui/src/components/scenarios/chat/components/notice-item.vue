@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 
 import HitPill from './hit-pill.vue'
 
-import { AUTO_SPEAK_NOTICE_SOURCE, LIVE_ROOM_NOTICE_SOURCE } from '../../../../constants/chat'
+import { AUTO_SPEAK_NOTICE_SOURCE, LIVE_ROOM_NOTICE_SOURCE, PROACTIVE_NOTICE_SOURCE } from '../../../../constants/chat'
 import { extractMessageText } from '../../../../libs/chat-sync'
 import { liveRoomCommentKey, parseLiveRoomComments } from '../../../../libs/live-room'
 
@@ -28,7 +28,10 @@ const text = computed(() => extractMessageText(props.message))
  * A line that the character started on her own leaves no notice: the reply already reads as her speaking, and a pill
  * between her lines would tell the viewer that something besides her wrote them.
  */
-const herOwnLine = computed(() => props.message.notice?.source === AUTO_SPEAK_NOTICE_SOURCE)
+const herOwnLine = computed(() => {
+  const source = props.message.notice?.source
+  return source === AUTO_SPEAK_NOTICE_SOURCE || source === PROACTIVE_NOTICE_SOURCE
+})
 /** Comments that the room reader wrote into the conversation. They show as the viewers wrote them, not as a report. */
 const isLiveRoom = computed(() => props.message.notice?.source === LIVE_ROOM_NOTICE_SOURCE)
 const roomComments = computed(() => {

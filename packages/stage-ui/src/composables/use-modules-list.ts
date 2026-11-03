@@ -14,6 +14,7 @@ import { useFactorioStore } from '../stores/modules/gaming-factorio'
 import { useMinecraftStore } from '../stores/modules/gaming-minecraft'
 import { useHearingStore } from '../stores/modules/hearing'
 import { useHomeAssistantStore } from '../stores/modules/home-assistant'
+import { useProactiveChatStore } from '../stores/modules/proactive-chat'
 import { useSpeechStore } from '../stores/modules/speech'
 import { useStickersStore } from '../stores/modules/stickers'
 import { useTwitterStore } from '../stores/modules/twitter'
@@ -50,6 +51,7 @@ export function useModulesList() {
   const homeAssistantStore = useHomeAssistantStore()
   const artistryStore = useArtistryStore()
   const memoryStore = useMemoryStore()
+  const proactiveChatStore = useProactiveChatStore()
   const toolCardsStore = useToolCardsStore()
   const beatSyncState = ref<BeatSyncDetectorState>()
   const beatSyncSupported = isBeatSyncSupported()
@@ -136,6 +138,15 @@ export function useModulesList() {
       icon: 'i-solar:book-bookmark-bold-duotone',
       to: '/settings/modules/memory-long-term',
       configured: memoryStore.enabled,
+      category: 'essential',
+    },
+    {
+      id: 'emotion',
+      name: t('settings.pages.modules.emotion.title'),
+      description: t('settings.pages.modules.emotion.description'),
+      icon: 'i-solar:heart-pulse-bold-duotone',
+      to: '/settings/modules/emotion',
+      configured: proactiveChatStore.enabled,
       category: 'essential',
     },
     {

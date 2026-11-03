@@ -1,3 +1,5 @@
+import type { EmotionLabel } from '@proj-airi/stage-shared/emotion'
+
 export enum Emotion {
   Happy = 'happy',
   Sad = 'sad',
@@ -61,4 +63,26 @@ export const EMOTION_SpineAnimationName_value = {
 export interface EmotionPayload {
   name: Emotion
   intensity: number
+  /** How long a VRM keeps the expression before it returns to neutral. The default fits a reaction in a reply. */
+  durationMs?: number
+}
+
+/**
+ * The expression name for a persistent emotion label. The state store uses labels from many sources, and the Stage
+ * keeps its own shorter list of expressions. Each label maps to the closest expression that the Stage can show.
+ */
+const EMOTION_STAGE_NAME: Record<EmotionLabel, Emotion> = {
+  happy: Emotion.Happy,
+  sad: Emotion.Sad,
+  angry: Emotion.Angry,
+  surprised: Emotion.Surprise,
+  relaxed: Emotion.Neutral,
+  confused: Emotion.Question,
+  tired: Emotion.Neutral,
+  affectionate: Emotion.Happy,
+  awkward: Emotion.Awkward,
+}
+
+export function emotionPayloadFromLabel(label: EmotionLabel, intensity: number): EmotionPayload {
+  return { name: EMOTION_STAGE_NAME[label], intensity }
 }
