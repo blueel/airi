@@ -8,6 +8,7 @@ const translate: ProviderTranslator = key => key
 const browserOnlyProviderIds = new Set(['browser-web-speech-api'])
 const localApiProviderIds = new Set([
   'aivis-speech',
+  'breeze-tts',
   'index-tts-vllm',
   'lm-studio',
   'ollama',

@@ -1,3 +1,4 @@
+export * from './chat'
 export * from './emotions'
 export * from './inject'
 export * from './public-links'

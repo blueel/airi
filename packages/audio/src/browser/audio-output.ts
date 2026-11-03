@@ -1,5 +1,8 @@
 import type { PcmBlock, PlayedAudio, PlayingAudio } from '@proj-airi/pipelines-audio'
 
+/** How long a clip waits for a suspended context to come back before it fails. */
+const SUSPEND_WAIT_MS = 20_000
+
 /**
  * One clip on a Web Audio context.
  *
@@ -36,7 +39,7 @@ export class AudioOutput implements PlayingAudio {
   }
 
   private async load(audio: Blob | ReadableStream<PcmBlock>) {
-    if (this.context.state !== 'running')
+    if (!await this.waitForRunning())
       throw new Error('Playback requires a running audio context')
     if (audio instanceof Blob) {
       const decoded = await this.context.decodeAudioData(await audio.arrayBuffer())
@@ -121,10 +124,43 @@ export class AudioOutput implements PlayingAudio {
     return this.done
   }
 
-  /** Triggering workflow: browser suspends or closes the audio context → fail pending playback and silence receipt. */
+  /** Triggering workflow: browser suspends or closes the audio context → resume, or fail when it closed. */
   private readonly contextChanged = () => {
-    if (this.context.state !== 'running' && !this.settled)
-      this.finish(new Error('Audio context stopped during playback'))
+    if (this.settled || this.stopped || this.context.state === 'running')
+      return
+    if (this.context.state === 'closed') {
+      this.finish(new Error('Audio context closed during playback'))
+      return
+    }
+    // NOTICE:
+    // A phone suspends the context when the screen locks or audio focus moves,
+    // and the stopped clock leaves queued clips waiting forever. Resume instead
+    // of failing the reply; the sources continue where they stopped.
+    // Source: Chrome Android audio-focus behaviour.
+    // Removal: when platforms stop suspending contexts during playback.
+    if (!this.stopped)
+      void this.context.resume().catch(() => {})
+  }
+
+  /**
+   * Waits for a usable clock, asking a suspended context to resume.
+   *
+   * A browser only grants `resume()` from a user gesture, so a clip that arrives
+   * while the page is in the background waits instead of failing. The wait is
+   * bounded, so a context that never returns cannot hold a reply open.
+   */
+  private async waitForRunning(timeoutMs = SUSPEND_WAIT_MS) {
+    if (this.context.state === 'closed')
+      return false
+    const deadline = Date.now() + timeoutMs
+    while (this.context.state !== 'running') {
+      void this.context.resume().catch(() => {})
+      if (Date.now() > deadline)
+        return false
+      await new Promise<void>(resolve => setTimeout(resolve, 100))
+    }
+
+    return true
   }
 
   private finish(error?: Error) {

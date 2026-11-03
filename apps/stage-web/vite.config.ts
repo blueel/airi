@@ -1,3 +1,5 @@
+import type { ProxyOptions } from 'vite'
+
 import process, { cwd, env } from 'node:process'
 
 import { execSync } from 'node:child_process'
@@ -45,6 +47,45 @@ function hasFlagEnableMkcert(): boolean {
   return false
 }
 
+/**
+ * Same-origin route to the loopback Breeze-TTS-2 server.
+ *
+ * The provider's seeded base URL is `/breeze-tts/` rather than
+ * `http://127.0.0.1:9310/`. A page opened from another origin (the public
+ * HTTPS preview, a phone on the LAN) cannot use the loopback address: it points
+ * at the viewer's own device, and an `http:` request from an `https:` page is
+ * blocked as mixed content. Forwarding one path keeps the provider address
+ * valid wherever the page is opened from.
+ */
+export const breezeTtsProxy: Record<string, ProxyOptions> = {
+  '/breeze-tts': {
+    target: 'http://127.0.0.1:9310',
+    changeOrigin: true,
+    rewrite: path => path.replace(/^\/breeze-tts/, ''),
+  },
+}
+
+/**
+ * Forwards the Ollama OpenAI-compatible API through whichever origin serves the
+ * app, for the same reason as `breezeTtsProxy`.
+ *
+ * The desktop-only `http://localhost:11434/v1/` address breaks the moment the
+ * page leaves the machine running Ollama: on a phone `localhost` is the phone,
+ * and the public HTTPS preview cannot call a plain `http:` port at all. Ollama
+ * also listens on the loopback interface only, so no LAN address exists to
+ * point at instead.
+ *
+ * The seeded base URL is therefore `/ollama/v1/`, which resolves against the
+ * dev and preview servers and reaches the loopback server from either.
+ */
+export const ollamaProxy: Record<string, ProxyOptions> = {
+  '/ollama': {
+    target: 'http://127.0.0.1:11434',
+    changeOrigin: true,
+    rewrite: path => path.replace(/^\/ollama/, ''),
+  },
+}
+
 export default defineConfig({
   optimizeDeps: {
     exclude: [
@@ -84,6 +125,7 @@ export default defineConfig({
     },
   },
   server: {
+    proxy: { ...breezeTtsProxy, ...ollamaProxy },
     fs: {
       // To mute errors like:
       //   The request id ".../node_modules/@fontsource/sniglet/files/sniglet-latin-400-normal.woff" is outside of Vite serving allow list.
@@ -270,7 +312,10 @@ export default defineConfig({
 
     // Browser tests mount short-lived apps. A delayed DevTools setup can run
     // after the test app is gone, so only load this plugin for the real app.
-    ...(env.VITEST ? [] : [VueDevTools()]),
+    //
+    // Its floating toggles sit over the stage and read as part of the UI, so it
+    // is opt-in: `VUE_DEVTOOLS=true pnpm dev`.
+    ...(env.VITEST || env.VUE_DEVTOOLS !== 'true' ? [] : [VueDevTools()]),
 
     // Web exposes pinned remote models. The browser downloads only the selected model.
     // The wake word and voiceprint models download when their features first prepare.

@@ -174,6 +174,12 @@ catalogs:
     '@guiiai/logg':
       specifier: ^1.2.12
       version: 1.2.12
+    '@gutenye/ocr-browser':
+      specifier: ^1.4.9
+      version: 1.4.9
+    '@gutenye/ocr-models':
+      specifier: ^1.4.2
+      version: 1.4.2
     '@histoire/plugin-vue':
       specifier: 1.0.0-beta.1
       version: 1.0.0-beta.1
@@ -1267,7 +1273,9 @@ overrides:
 packageExtensionsChecksum: sha256-lLxz4me6BFXSsuohDen54RU9DmiItse34Xa+IWGtSzU=
 
 patchedDependencies:
+  '@gutenye/ocr-browser@1.4.9': 763c4e8aa595c55617bd190e9acb9f79054ad44ec6c4507e979b8d4a30a57957
   '@xsai-ext/responses@0.5.1': 869608a1a960b80aef6290aef41763c909252e2401364f1bfa75a67134866eed
+  js-clipper@1.0.1: b3c93d2b2afd17f0ce73f8ec22ac0f38f0fbd668c121a638041f852e96d18b68
   mineflayer-pathfinder: 4bbfdca823ab48b74086e6e7d4b2f9baf5ee7c0ba9aee0c279b3c91c50bfd797
   pixi-live2d-display: cee60f8b5121eb195718c1935f9a3a6012cc8d4e8b6deeafd29bad772c678530
   sponsorkit@17.1.0: f5887da52a29ae85732e01644d05c0c274231fe76b95aebeafbfab6dc4444f88
@@ -2960,6 +2968,9 @@ importers:
       '@formkit/auto-animate':
         specifier: 'catalog:'
         version: 0.10.0(vue@3.5.41(typescript@6.0.3))
+      '@gutenye/ocr-models':
+        specifier: 'catalog:'
+        version: 1.4.2
       '@huggingface/transformers':
         specifier: 'catalog:'
         version: 3.8.1
@@ -5050,6 +5061,9 @@ importers:
       '@formkit/auto-animate':
         specifier: 'catalog:'
         version: 0.10.0(vue@3.5.41(typescript@6.0.3))
+      '@gutenye/ocr-browser':
+        specifier: 'catalog:'
+        version: 1.4.9(patch_hash=763c4e8aa595c55617bd190e9acb9f79054ad44ec6c4507e979b8d4a30a57957)
       '@huggingface/transformers':
         specifier: 'catalog:'
         version: 3.8.1
@@ -5323,6 +5337,9 @@ importers:
       ofetch:
         specifier: 'catalog:'
         version: 1.5.1
+      onnxruntime-web:
+        specifier: npm:onnxruntime-web@^1.27.0
+        version: 1.27.0
       pinia:
         specifier: 'catalog:'
         version: 4.0.3(@vue/devtools-api@8.2.1)(typescript@6.0.3)(vue@3.5.41(typescript@6.0.3))
@@ -8928,6 +8945,15 @@ packages:
   '@guiiai/logg@1.2.12':
     resolution: {integrity: sha512-f8rXJiIixxX8qb0Ldn7n6MNil1M+fY9r2xiCC2+XnVB4YTWPI6951+UNYErnt+ou7S0TMR39qvlb1FkyHwPQNQ==}
 
+  '@gutenye/ocr-browser@1.4.9':
+    resolution: {integrity: sha512-CpPIRddvmao2XgxxZW+Hr9c6dx0RGUodP/SZdbG50IRqDd2gkJUxIkokSy5xnFU7q2Ufmj7uIzVJEtkAKKkKNg==}
+
+  '@gutenye/ocr-common@1.4.9':
+    resolution: {integrity: sha512-1ry8Uw5fWZBZ/TsYB31x/YH04cOk7cO2PyLcauW9rmrK+0bxV0IeBRWngeje+fhdVJ99L1s+Y0BZwrjEVCxgOA==}
+
+  '@gutenye/ocr-models@1.4.2':
+    resolution: {integrity: sha512-y7cLEpGFOeroavopfCd/ejyZB/UeF6xdn0mBFqVHNOI5wQTv2My+/nKxvxKTtG4DVMBzt9TpOfaX7aZGbuciUw==}
+
   '@henrygd/queue@1.2.0':
     resolution: {integrity: sha512-jW/BLSTpcvExDhqJGxtIPgGr2O0IFF8XUNDwEbfCfhrXT8a4xztQ9Lv6U/vbYzYC0xVWn+3zv6YnLUh3bEFUKA==}
 
@@ -12358,6 +12384,9 @@ packages:
     resolution: {integrity: sha512-gKpExv4RbB9luVG+SucTXoqPZv/gzu/Yvz6BNO+8kpNxJ2x+I/ulryzl5W9BRciahZGp5Tls3Dp5XP1ztVGbMw==}
     peerDependencies:
       vue: ^2.7.0 || ^3.0.0
+
+  '@techstark/opencv-js@4.9.0-release.3':
+    resolution: {integrity: sha512-y+KoLLlkXVUHWozYlN1vmMD9TQMPJObqml5nPA5vPWgHtOgm8q5O74UtzM23eayidvmeFX6tF5e2gDdyxcpy3Q==}
 
   '@tokenizer/inflate@0.5.1':
     resolution: {integrity: sha512-56U2O6fDLFtqokwWh597IdeUgtM7j+TT9tb1soybhgA6cy163gAcVmoQr8H4Ud/CkgCkViwcuLyqtn6wYqw59Q==}
@@ -17021,6 +17050,9 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
 
+  js-clipper@1.0.1:
+    resolution: {integrity: sha512-0XYAS0ZoCki5K0fWwj8j8ug4mgxHXReW3ayPbVqr4zXPJuIs2pyvemL1sALadsEiAywZwW5Ify1XfU4bNJvokg==}
+
   js-cookie@3.0.8:
     resolution: {integrity: sha512-yeJd4aNAdYZQjaon2bpD/Gb0B/omw7HQOsynXXcOiWVCacbBcPlgn8S/d1X6blFSaHao7ozqtW7NZW19xpCtIw==}
 
@@ -19760,6 +19792,9 @@ packages:
 
   tiny-async-pool@1.3.0:
     resolution: {integrity: sha512-01EAw5EDrcVrdgyCLgoSPvqznC0sVxDSVeiOz09FUpjh71G79VCqneOr+xvt7T1r76CF6ZZfPjHorN2+d+3mqA==}
+
+  tiny-invariant@1.3.3:
+    resolution: {integrity: sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg==}
 
   tiny-open@1.3.0:
     resolution: {integrity: sha512-GUFS8yjJZq0oWqCKCJVHcBgMpmi2WEGXY1le3E5ncR0DsgTII5uUyxtfk8/vGyDDGBE42UYHR6Ocvlk8mkXSRg==}
@@ -23897,6 +23932,20 @@ snapshots:
       error-stack-parser: 2.1.4
       pathe: 2.0.3
 
+  '@gutenye/ocr-browser@1.4.9(patch_hash=763c4e8aa595c55617bd190e9acb9f79054ad44ec6c4507e979b8d4a30a57957)':
+    dependencies:
+      '@gutenye/ocr-common': 1.4.9
+      '@gutenye/ocr-models': 1.4.2
+      onnxruntime-web: 1.27.0
+
+  '@gutenye/ocr-common@1.4.9':
+    dependencies:
+      '@techstark/opencv-js': 4.9.0-release.3
+      js-clipper: 1.0.1(patch_hash=b3c93d2b2afd17f0ce73f8ec22ac0f38f0fbd668c121a638041f852e96d18b68)
+      tiny-invariant: 1.3.3
+
+  '@gutenye/ocr-models@1.4.2': {}
+
   '@henrygd/queue@1.2.0': {}
 
   '@hey-api/codegen-core@0.9.1(magicast@0.5.4)':
@@ -26998,6 +27047,8 @@ snapshots:
     dependencies:
       '@tanstack/virtual-core': 3.17.8
       vue: 3.5.41(typescript@6.0.3)
+
+  '@techstark/opencv-js@4.9.0-release.3': {}
 
   '@tokenizer/inflate@0.5.1(supports-color@10.2.2)':
     dependencies:
@@ -32446,6 +32497,8 @@ snapshots:
       js-cookie: 3.0.8
       nopt: 7.2.1
 
+  js-clipper@1.0.1(patch_hash=b3c93d2b2afd17f0ce73f8ec22ac0f38f0fbd668c121a638041f852e96d18b68): {}
+
   js-cookie@3.0.8: {}
 
   js-tokens@10.0.0: {}
@@ -35975,6 +36028,8 @@ snapshots:
   tiny-async-pool@1.3.0:
     dependencies:
       semver: 5.7.2
+
+  tiny-invariant@1.3.3: {}
 
   tiny-open@1.3.0: {}
 

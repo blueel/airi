@@ -5,6 +5,7 @@ import type { ChatHistoryItem } from '@proj-airi/stage-ui/types/chat'
 import { ChatBackgroundTasks, ChatHistory } from '@proj-airi/stage-ui/components'
 import { useChatComposer, VoiceCallCapsule } from '@proj-airi/stage-ui/components/scenarios/chat'
 import { useAnalytics } from '@proj-airi/stage-ui/composables/use-analytics'
+import { useAutoSpeak } from '@proj-airi/stage-ui/composables/use-auto-speak'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
 import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
 import { useChatStreamStore } from '@proj-airi/stage-ui/stores/chat/stream-store'
@@ -46,6 +47,8 @@ const isActiveSessionSending = computed(() => (
 const visibleStreamingMessage = streamingMessage
 const { trackChatMessageDeleted } = useAnalytics()
 const { rerunToolCall } = useChatToolCallRerun()
+// The broadcast runs beside the composer, so it follows the conversation that the panel shows.
+useAutoSpeak()
 
 async function handleDeleteMessage(payload: { message: ChatHistoryItem, index: number }) {
   const { index, message } = payload

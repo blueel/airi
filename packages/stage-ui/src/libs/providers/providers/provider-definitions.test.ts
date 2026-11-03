@@ -68,6 +68,7 @@ describe('migrated provider definitions', () => {
       'elevenlabs',
       'deepgram-tts',
       'microsoft-speech',
+      'breeze-tts',
       'index-tts-vllm',
       'alibaba-cloud-model-studio',
       'volcengine',

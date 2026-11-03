@@ -571,21 +571,25 @@ chatHookCleanups.push(onAssistantResponseEnd(async (_message, context) => {
   void voice.finishResponse(context).catch(error => console.error('Speech response completion failed', error))
 }))
 
-// Resume audio context on first user interaction (browser requirement)
-let audioContextResumed = false
-function resumeAudioContextOnInteraction() {
-  if (audioContextResumed || !audioContext)
-    return
-  audioContextResumed = true
-  audioContext.resume().catch(() => {
-    // Ignore errors - audio context will be resumed when needed
-  })
+// NOTICE:
+// A phone suspends the audio context when the screen locks or audio focus
+// moves, and only a gesture resumes it. Resuming once left the app silent for
+// the rest of the session.
+// Source: Chrome Android audio-focus behaviour.
+// Removal: when the platform resumes Web Audio on its own.
+function resumeAudioContext() {
+  if (audioContext?.state === 'suspended')
+    void audioContext.resume().catch(() => {})
 }
 
 // The listeners close over this setup scope, so a listener that outlives the
 // stage keeps the whole unmounted stage alive, including its WebGL canvas.
 // `useEventListener` removes them on unmount if no interaction came first.
-useEventListener(['click', 'touchstart', 'keydown'], resumeAudioContextOnInteraction, { once: true, passive: true })
+useEventListener(['click', 'touchstart', 'keydown'], resumeAudioContext, { passive: true })
+useEventListener(document, 'visibilitychange', () => {
+  if (document.visibilityState === 'visible')
+    resumeAudioContext()
+})
 
 // NOTICE:
 // DuckDB stays off until a separate layer owns it. Nothing reads it yet,

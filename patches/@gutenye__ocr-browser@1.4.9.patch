@@ -1,0 +1,24 @@
+diff --git a/build/index.js b/build/index.js
+index 468ed22301ed03ba69401307ceec2fe6a01f30e0..7d7231c5ecf4dd4ebd7451f0e2362d1472ffa61c 100644
+--- a/build/index.js
++++ b/build/index.js
+@@ -1,6 +1,6 @@
+ import Ocr, { registerBackend } from '@gutenye/ocr-common';
+ import { splitIntoLineImages } from '@gutenye/ocr-common/splitIntoLineImages';
+-import { InferenceSession } from 'onnxruntime-web';
++import { InferenceSession } from 'onnxruntime-web/wasm';
+ import { FileUtils } from './FileUtils.js';
+ import { ImageRaw } from './ImageRaw.js';
+ registerBackend({ FileUtils, ImageRaw, InferenceSession, splitIntoLineImages });
+diff --git a/src/index.ts b/src/index.ts
+index ff278d869065ea6cd87f97d899e75dd3cb6ba2b3..8ab812302392b2644199de47a35d474894603127 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -1,6 +1,6 @@
+ import Ocr, { registerBackend } from '@gutenye/ocr-common'
+ import { splitIntoLineImages } from '@gutenye/ocr-common/splitIntoLineImages'
+-import { InferenceSession } from 'onnxruntime-web'
++import { InferenceSession } from 'onnxruntime-web/wasm'
+ import { FileUtils } from './FileUtils'
+ import { ImageRaw } from './ImageRaw'
+ 

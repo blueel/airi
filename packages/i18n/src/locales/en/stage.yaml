@@ -213,6 +213,44 @@ chat:
     retry: Retry
     send: Send message
     stop: Stop response
+  auto-speak:
+    start: Auto broadcast
+    stop: Stop auto broadcast
+    prompt: |-
+      Nobody is talking in the stream, and the audience is watching you quietly. Speak up on your own: one or two sentences that pick up the moment, or bring the viewers in.
+      Do not mention this note, and do not call yourself a program.
+  live-room:
+    title: Live room reader
+    description: Share the live screen, draw a box around the comments, and a local OCR sends every viewer line to the conversation.
+    share-screen: Choose the screen or window to read
+    share-screen-hint: Recognition runs on this computer only. Neither the frame nor the text is uploaded
+    stop-sharing: Stop sharing
+    draw-region: Drag a box around the comment area
+    clear-region: Clear the box
+    region-hint: Only the red box is read
+    start: Start reading
+    stop: Stop reading
+    interval: Read every
+    interval-seconds: '{seconds}s'
+    send-to-chat: Send to the character
+    last-read: Last read {time}
+    status-idle: Choose a screen or window first
+    status-ready: Ready, press start
+    status-reading: Reading…
+    status-loading-model: Loading the local OCR models…
+    status-count: '{count} sent'
+    recent: Recently read
+    badge: Viewers
+    unsupported: This browser cannot share a screen. Open the app in Chrome or Edge on a computer.
+    share-failed: Could not share the screen
+    share-first: Share a screen before you start reading
+    region-first: Draw a box around the comment area first
+    read-failed: Could not read the screen
+    ocr-failed: The local OCR could not start
+    ocr-hint: Recognition runs on this machine (PaddleOCR on ONNX Runtime) and never goes online.
+    ocr-loading-hint: The first read loads about 15 MB of models, which takes a few seconds.
+    message-header: 'Viewers in the live room are saying:'
+    message-request: Answer one or two of them naturally, without repeating each line.
   message:
     character-name:
       airi: AIRI

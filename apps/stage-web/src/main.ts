@@ -24,6 +24,7 @@ import { routes } from 'vue-router/auto-routes'
 
 import App from './App.vue'
 
+import { seedDefaultProvider } from './modules/default-provider'
 import { i18n } from './modules/i18n'
 
 import '@proj-airi/font-cjkfonts-allseto/index.css'
@@ -70,6 +71,9 @@ router.beforeEach((to, from) => {
 router.afterEach(() => {
   NProgress.done()
 })
+
+// Runs before any store is created so the stores read the seeded values.
+seedDefaultProvider()
 
 createApp(App)
   .use(synced.vue)

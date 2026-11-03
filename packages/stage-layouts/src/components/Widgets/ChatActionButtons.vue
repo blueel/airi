@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { ChatLiveRoomDialog } from '@proj-airi/stage-ui/components/scenarios/chat'
+import { useAutoSpeakStore } from '@proj-airi/stage-ui/stores/auto-speak'
+import { useLiveRoomStore } from '@proj-airi/stage-ui/stores/live-room'
 import { useTheme } from '@proj-airi/ui'
 import { useLocalStorage } from '@vueuse/core'
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger } from 'reka-ui'
@@ -13,6 +16,10 @@ import { BackgroundDialogPicker } from '../Backgrounds'
 
 const { themeMode, switchToNextTheme } = useTheme()
 const { t } = useI18n()
+const autoSpeak = useAutoSpeakStore()
+const autoSpeakLabel = computed(() => t(autoSpeak.enabled ? 'stage.chat.auto-speak.stop' : 'stage.chat.auto-speak.start'))
+const liveRoom = useLiveRoomStore()
+const liveRoomOpen = ref(false)
 
 // The button shows the current theme, and its label tells what a press selects.
 const themeIcons = {
@@ -42,7 +49,40 @@ const sendModeLabels = computed<Record<SendMode, string>>(() => ({
 <template>
   <ActionAbout v-model="aboutOpen" hide-trigger />
   <BackgroundDialogPicker v-model="backgroundDialogOpen" />
+  <ChatLiveRoomDialog v-model="liveRoomOpen" />
   <div absolute bottom--8 right-0 flex gap-2>
+    <!-- Reads the viewer comments of the live room from a region of the shared screen. -->
+    <ChatToolbarButton
+      data-testid="live-room-toggle"
+      :active="liveRoom.running"
+      :aria-pressed="liveRoom.running"
+      :title="t('stage.chat.live-room.title')"
+      :aria-label="t('stage.chat.live-room.title')"
+      @click="liveRoomOpen = true"
+    >
+      <div
+        :class="[
+          liveRoom.running ? 'i-solar:crop-bold-duotone' : 'i-solar:crop-outline',
+          'size-5',
+        ]"
+      />
+    </ChatToolbarButton>
+    <!-- A broadcast keeps her talking while nobody talks to her, so the stream never goes quiet. -->
+    <ChatToolbarButton
+      data-testid="auto-speak-toggle"
+      :active="autoSpeak.enabled"
+      :aria-pressed="autoSpeak.enabled"
+      :title="autoSpeakLabel"
+      :aria-label="autoSpeakLabel"
+      @click="autoSpeak.toggle()"
+    >
+      <div
+        :class="[
+          autoSpeak.enabled ? 'i-solar:videocamera-record-bold-duotone' : 'i-solar:videocamera-record-outline',
+          'size-5',
+        ]"
+      />
+    </ChatToolbarButton>
     <ViewControls />
     <ChatToolbarButton
       :title="t('stage.mobile-tools.background')"

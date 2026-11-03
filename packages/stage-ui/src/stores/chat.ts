@@ -1660,6 +1660,8 @@ export const useChatStore = defineStore('chat', () => {
       retry: inSpeechPlayer,
       send: inSpeechPlayer,
       stopBackgroundTask: inSpeechPlayer,
+      // A notice makes the agent speak, so it belongs where the Stage plays that speech, like a typed send.
+      notifyConversation: inSpeechPlayer,
     },
     state: true,
   },
