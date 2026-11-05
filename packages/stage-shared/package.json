@@ -26,6 +26,7 @@
     "./memory-secret": "./src/memory-secret.ts",
     "./model-assets": "./src/model-assets/index.ts",
     "./plugin-host": "./src/plugin-host.ts",
+    "./polyfills": "./src/polyfills.ts",
     "./screen-ambient-light": "./src/screen-ambient-light/index.ts",
     "./server-channel-qr": "./src/server-channel-qr.ts",
     "./settings-search": "./src/settings-search/index.ts",

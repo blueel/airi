@@ -1,7 +1,13 @@
 import type { Plugin } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
 
+// The polyfill must evaluate before any module that calls the ES2024 APIs at module
+// scope, so this import order is deliberate and exempt from sorting.
+/* eslint-disable perfectionist/sort-imports */
+import '@proj-airi/stage-shared/polyfills'
+
 import Tres from '@tresjs/core'
+/* eslint-enable perfectionist/sort-imports */
 
 import { autoAnimatePlugin } from '@formkit/auto-animate/vue'
 import { PiniaColada } from '@pinia/colada'

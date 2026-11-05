@@ -1,8 +1,14 @@
 import type { Plugin } from 'vue'
 import type { Router, RouteRecordRaw } from 'vue-router'
 
+// The polyfill must evaluate before any module that calls the ES2024 APIs at module
+// scope, so this import order is deliberate and exempt from sorting.
+/* eslint-disable perfectionist/sort-imports */
+import '@proj-airi/stage-shared/polyfills'
+
 import Tres from '@tresjs/core'
 import NProgress from 'nprogress'
+/* eslint-enable perfectionist/sort-imports */
 
 import { Capacitor } from '@capacitor/core'
 import { Keyboard } from '@capacitor/keyboard'
