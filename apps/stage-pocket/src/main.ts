@@ -35,8 +35,14 @@ import { i18n } from './modules/i18n'
 import { WebAuthentication } from './modules/web-authentication'
 import { setupMikaTools } from './stores/tools/mika'
 
-import '@proj-airi/font-cjkfonts-allseto/index.css'
-import '@proj-airi/font-xiaolai/index.css'
+// NOTICE:
+// Pocket slim build: the two CJK fonts (@proj-airi/font-cjkfonts-allseto,
+// @proj-airi/font-xiaolai) are ~35MB in the APK. They are removed here and
+// stripped from the bundle in vite.config.ts (stripVoiceRuntimeAssets); the
+// UnoCSS preflight still emits @font-face declarations, but the missing files
+// make the browser fall back to system fonts. Text rendering is unaffected.
+// Removal condition: restore these imports and un-strip the fonts when the
+// original typography is wanted.
 import '@unocss/reset/tailwind.css'
 import 'splitpanes/dist/splitpanes.css'
 import 'vue-sonner/style.css'

@@ -26,7 +26,6 @@ import { paraformerBilingualZhEn, xAsrBilingualZhEnInt8, zipformerMultilingual }
 import { createSettingsSearch } from '@proj-airi/stage-pages/vite/settings-search'
 import { speakerModel } from '@proj-airi/stage-shared/speaker-model'
 import { kwsModel } from '@proj-airi/stage-ui/libs/voice/kws-model-info'
-import { Download } from '@proj-airi/unplugin-fetch/vite'
 import { DownloadLive2DSDK } from '@proj-airi/unplugin-live2d-sdk/vite'
 import { Sherpaw } from '@proj-airi/vite-plugin-sherpaw'
 import { defineConfig } from 'vite'
@@ -39,7 +38,36 @@ function isEnvTruthy(value: string | undefined | null): boolean {
   return /^(?:1|true|t|yes|y|on)$/i.test(value.trim())
 }
 
-const stageUIAssetsRoot = resolve(join(import.meta.dirname, '..', '..', 'packages', 'stage-ui', 'src', 'assets'))
+/**
+ * NOTICE:
+ * Pocket-specific slim build: strips the local voice runtimes (ASR, keyword
+ * spotting, speaker diarization/embedding, and the bundled wake-word model)
+ * from the output. The sherpa-onnx WASM engines arrive as assets through
+ * `@sherpaw/asr` / `@sherpaw/xsai-transcription` imports shared with the other
+ * stage apps; the code only fetches them when a voice feature is used, so
+ * deleting the assets degrades exactly those features instead of the whole app.
+ * Saves ~60MB in the APK. TTS (Breeze-TTS) runs on a remote server and is
+ * unaffected.
+ * The two CJK fonts (~35MB) are stripped by the same plugin: the @font-face
+ * declarations survive, the missing files fall back to system fonts.
+ * Removal condition: restore when local speech recognition or the original
+ * typography is wanted on mobile.
+ */
+const STRIPPED_VOICE_ASSETS = /(?:^|\/)(?:asr|kws|speaker-embedding|sherpa-onnx-wasm-main-speaker-diarization)-[^/]+\.wasm$|^preload-[^/]+\.data$|cjkFonts_allseto-[^/]+\.ttf$|XiaolaiSC-[^/]+\.ttf$/
+
+function stripVoiceRuntimeAssets(): PluginOption {
+  return {
+    name: 'airi-pocket-strip-voice-runtime',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      for (const name of Object.keys(bundle)) {
+        if (STRIPPED_VOICE_ASSETS.test(name))
+          delete bundle[name]
+      }
+    },
+  }
+}
+
 const sharedCacheDir = resolve(join(import.meta.dirname, '..', '..', '.cache'))
 const settingsSearch = createSettingsSearch()
 
@@ -100,7 +128,11 @@ export default defineConfig({
     },
   },
   build: {
-    sourcemap: true,
+    // NOTICE:
+    // Pocket-specific slim build: sourcemaps are pure debugging payload and cost
+    // ~25MB in the APK; the owner builds locally without needing them.
+    // Removal condition: restore `true` when debugging a production build.
+    sourcemap: false,
   },
   worker: {
     format: 'es',
@@ -127,13 +159,19 @@ export default defineConfig({
         })())],
 
     Info(),
-    // Transcription and voiceprint models stay remote. Pocket bundles the small wake word model, so detection works without a download.
+    // NOTICE:
+    // Pocket-specific slim build: transcription and speaker models stay remote,
+    // and the wake-word model is no longer bundled (see stripVoiceRuntimeAssets).
+    // Wake-word detection degrades to a download-on-demand failure until the
+    // bundled model is restored here.
     Sherpaw({
       models: [paraformerBilingualZhEn, zipformerMultilingual, xAsrBilingualZhEnInt8, kwsModel, speakerModel],
-      developmentModels: [kwsModel],
-      bundledModels: [kwsModel],
+      developmentModels: [],
+      bundledModels: [],
       cacheDir: sharedCacheDir,
     }),
+
+    stripVoiceRuntimeAssets(),
 
     Yaml(),
 
@@ -191,11 +229,12 @@ export default defineConfig({
     // https://github.com/webfansplz/vite-plugin-vue-devtools
     VueDevTools(),
 
+    // NOTICE:
+    // Pocket slim build: preset model downloads removed together with the
+    // trimmed `displayModelsPresets` in stage-ui (only 黑白猫猫 remains, which
+    // lives in the repo, not behind a Download). Restore these calls together
+    // with the preset entries when the other character models are wanted.
     DownloadLive2DSDK(),
-    Download('https://dist.ayaka.moe/live2d-models/hiyori_free_zh.zip', 'hiyori_free_zh.zip', 'live2d/models', { parentDir: stageUIAssetsRoot, cacheDir: sharedCacheDir }),
-    Download('https://dist.ayaka.moe/live2d-models/hiyori_pro_zh.zip', 'hiyori_pro_zh.zip', 'live2d/models', { parentDir: stageUIAssetsRoot, cacheDir: sharedCacheDir }),
-    Download('https://dist.ayaka.moe/vrm-models/VRoid-Hub/AvatarSample-A/AvatarSample_A.vrm', 'AvatarSample_A.vrm', 'vrm/models/AvatarSample-A', { parentDir: stageUIAssetsRoot, cacheDir: sharedCacheDir }),
-    Download('https://dist.ayaka.moe/vrm-models/VRoid-Hub/AvatarSample-B/AvatarSample_B.vrm', 'AvatarSample_B.vrm', 'vrm/models/AvatarSample-B', { parentDir: stageUIAssetsRoot, cacheDir: sharedCacheDir }),
 
     ...isEnvTruthy(process.env.VITE_CAP_SYNC_IOS_AFTER_BUILD ?? '')
       ? [{

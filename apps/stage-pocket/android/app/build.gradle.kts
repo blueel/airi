@@ -42,6 +42,15 @@ android {
         versionCode = androidVersionCode
         versionName = androidVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // NOTICE:
+        // Pocket-specific slim build: only arm64-v8a is packaged. x86/x86_64
+        // native libraries exist for emulator and ChromeOS use only; real
+        // Android phones are arm64. Saves ~11MB in the APK.
+        // Removal condition: restore when an emulator build is needed.
+        ndk {
+            // NOTICE: x86_64 added temporarily for local emulator debugging; revert to arm64-v8a only after done.
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     buildTypes {
