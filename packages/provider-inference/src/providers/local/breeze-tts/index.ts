@@ -5,7 +5,14 @@ import { z } from 'zod'
 
 import { defineProvider } from '../../registry'
 
-const DEFAULT_BASE_URL = 'http://127.0.0.1:9310/'
+// NOTICE:
+// Default points to a frp-tunneled breeze-server instead of loopback: the app
+// runs on phones where 127.0.0.1 is the phone itself, and the owner's PC
+// exposes the server through frp (VPS airi.example -> PC 127.0.0.1:9310).
+// The server has no auth and allows any origin, so plain HTTP works from WebView.
+// Removal condition: when the app ships a first-run flow that asks for the
+// local server address, restore 'http://127.0.0.1:9310/'.
+const DEFAULT_BASE_URL = 'http://airi.example/'
 const DEFAULT_MODEL = 'breeze-tts-2'
 const BUSY_RETRIES = 30
 const BUSY_RETRY_DELAY_MS = 500

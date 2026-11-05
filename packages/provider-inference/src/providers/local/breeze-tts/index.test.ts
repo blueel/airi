@@ -19,10 +19,10 @@ async function createProvider(config: Parameters<typeof providerBreezeTts.create
 }
 
 describe('breeze-tts provider', () => {
-  it('defaults to the local server and its single model', async () => {
+  it('defaults to the tunneled server and its single model', async () => {
     const config = z.parse(await providerBreezeTts.createProviderConfig({ t: translate }), {})
 
-    expect(config.baseUrl).toBe('http://127.0.0.1:9310/')
+    expect(config.baseUrl).toBe('http://airi.example/')
     expect(config.model).toBe('breeze-tts-2')
   })
 
