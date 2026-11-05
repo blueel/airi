@@ -37,6 +37,12 @@ const settings = computed(() => [
     to: '/settings/system/permissions',
   },
   {
+    title: t('settings.pages.system.update.title'),
+    description: t('settings.pages.system.update.description'),
+    icon: 'i-solar:refresh-circle-bold-duotone',
+    to: '/settings/system/update',
+  },
+  {
     title: t('settings.pages.system.developer.title'),
     description: t('settings.pages.system.developer.description'),
     icon: 'i-solar:code-bold-duotone',

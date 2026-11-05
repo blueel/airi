@@ -2550,6 +2550,25 @@ pages:
     permissions:
       description: View current permission status.
       title: Permission Management
+    update:
+      title: App Update
+      description: Check for a new build and install it from your update server.
+      current-version: Current version
+      manifest-url: Update source
+      manifest-url-description: Address of the latest.json manifest.
+      check: Check for updates
+      checking: Checking...
+      up-to-date: You are on the latest version.
+      available: Version {version} is available.
+      notes: Release notes
+      download: Download update
+      downloading: 'Downloading... {percent}%'
+      downloaded: Update downloaded ({size}).
+      install: Install update
+      installing: Opening the installer...
+      install-permission: Allow installing unknown apps for AIRI, then tap Install again.
+      native-only: Updates are only available in the Android app.
+      failed: 'Update failed: {message}'
     description: Customize your stage!
     sections:
       section:
