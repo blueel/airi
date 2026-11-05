@@ -308,8 +308,29 @@ async function selectSpeechVoice(voiceId: string | undefined) {
   })
 }
 
+/**
+ * Adds a speech provider with its default config when its card is selected
+ * before the provider page created the entry. Without the entry, model
+ * discovery skips the provider and the page reports no models.
+ */
+async function ensureSelectableSpeechProvider(sourceId: string) {
+  if (!sourceId || sourceId === 'speech-noop' || sourceId.startsWith('official-provider'))
+    return
+  if (providerStore.providers[sourceId])
+    return
+
+  const definition = providersStore.findProviderDefinition(sourceId)
+  if (!definition || definition.requiresCredentials !== false)
+    return
+
+  providerStore.ensureProvider(sourceId, sourceId, {})
+  providerStore.markProviderAdded(sourceId)
+  await providersStore.fetchModelsForProvider(sourceId).catch(() => undefined)
+}
+
 /** Persists the selection only after the leader commits its provider and model. */
 async function selectSpeechSource(sourceId: string) {
+  await ensureSelectableSpeechProvider(sourceId)
   const selection = await speechStore.selectSource(sourceId)
   if (!selection) {
     stopTestAudio()
@@ -377,6 +398,7 @@ async function syncOpenAICompatibleSettings() {
 
 onMounted(async () => {
   try {
+    await ensureSelectableSpeechProvider(activeSpeechProvider.value)
     await providersStore.loadModelsForConfiguredProviders()
     await speechStore.loadVoicesForProvider(activeSpeechProvider.value, activeSpeechModel.value || undefined)
     await syncOpenAICompatibleSettings()
@@ -390,6 +412,7 @@ onMounted(async () => {
 
 watch(activeSpeechProvider, async (newProvider) => {
   try {
+    await ensureSelectableSpeechProvider(newProvider)
     await providersStore.loadModelsForConfiguredProviders()
     if (newProvider !== activeSpeechProvider.value)
       return

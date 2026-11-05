@@ -20,6 +20,7 @@ const providerStore = useProviderConfigStore()
 const availableVoices = computed(() => speechStore.availableVoices[providerId] || [])
 
 onMounted(async () => {
+  await providersStore.fetchModelsForProvider(providerId)
   await speechStore.loadVoicesForProvider(providerId)
 })
 
