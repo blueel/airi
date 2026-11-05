@@ -33,6 +33,7 @@ import App from './App.vue'
 import { installDeepLinks } from './modules/deep-links'
 import { i18n } from './modules/i18n'
 import { WebAuthentication } from './modules/web-authentication'
+import { setupMikaTools } from './stores/tools/mika'
 
 import '@proj-airi/font-cjkfonts-allseto/index.css'
 import '@proj-airi/font-xiaolai/index.css'
@@ -76,6 +77,8 @@ for (const [name, source] of Object.entries(settingsSearchModules))
 const pinia = createPinia()
 const synced = setupSynced()
 pinia.use(synced.pinia)
+
+setupMikaTools(pinia)
 
 // TODO: vite-plugin-vue-layouts is long deprecated, replace with another layout solution
 const routeRecords = setupLayouts(routes as RouteRecordRaw[])

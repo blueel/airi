@@ -22,6 +22,8 @@ export const TOOL_ICONS = {
   widgets: 'i-tabler:layout-grid',
   imageJournal: 'i-tabler:palette',
   computerUse: 'i-tabler:device-desktop',
+  /** Tasks that run on the owner's phone. */
+  phone: 'i-tabler:device-mobile',
   homeAssistant: 'i-tabler:home',
   memory: 'i-tabler:book-2',
   wakeWords: 'i-tabler:microphone',

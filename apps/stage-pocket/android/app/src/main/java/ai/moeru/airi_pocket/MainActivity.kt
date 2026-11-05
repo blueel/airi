@@ -28,6 +28,7 @@ class MainActivity : BridgeActivity() {
 
     override fun load() {
         registerPlugin(MicrophonePermissionPlugin::class.java)
+        registerPlugin(MikaBridgePlugin::class.java)
         registerPlugin(WebAuthenticationPlugin::class.java)
         super.load()
 

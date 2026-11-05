@@ -2525,6 +2525,28 @@ pages:
     general:
       description: Dark theme, languages, etc.
       title: General
+    mika:
+      title: Phone Control
+      description: Let AIRI ask Mika on this phone to operate other apps.
+      enabled:
+        label: Enable phone control
+        description: AIRI can send tasks to Mika and read the result in chat.
+      base-url:
+        label: Mika address
+        description: Open Mika, choose Connect computer, turn on the local network mode, then copy the address here.
+      token:
+        label: Access token
+        description: Copy the token from the same Mika screen. It stays on this device.
+      test:
+        label: Test connection
+        testing: Testing...
+        success: 'Connected. Server version: {version}.'
+        failed: 'Connection failed: {message}'
+        missing: Fill in the address and the token first.
+      native-only: Phone control is only available in the Android app.
+      notice:
+        title: Before you start
+        body: Mika needs accessibility access and its background screen. Keep Mika open during a task. Payment and confirmation stay on the phone.
     permissions:
       description: View current permission status.
       title: Permission Management

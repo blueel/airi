@@ -24,6 +24,7 @@
     "./godot-stage": "./src/godot-stage/index.ts",
     "./memory-search": "./src/memory-search.ts",
     "./memory-secret": "./src/memory-secret.ts",
+    "./mika": "./src/mika/index.ts",
     "./model-assets": "./src/model-assets/index.ts",
     "./plugin-host": "./src/plugin-host.ts",
     "./polyfills": "./src/polyfills.ts",

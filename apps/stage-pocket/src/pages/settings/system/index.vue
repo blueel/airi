@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Capacitor } from '@capacitor/core'
 import { IconItem, RippleGrid } from '@proj-airi/stage-ui/components'
 import { useRippleGridState } from '@proj-airi/stage-ui/composables/use-ripple-grid-state'
 import { computed } from 'vue'
@@ -6,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const { lastClickedIndex, setLastClickedIndex } = useRippleGridState()
+const isAndroid = Capacitor.getPlatform() === 'android'
 
 const settings = computed(() => [
   {
@@ -20,6 +22,14 @@ const settings = computed(() => [
     icon: 'i-solar:pallete-2-bold-duotone',
     to: '/settings/system/color-scheme',
   },
+  ...(isAndroid
+    ? [{
+        title: t('settings.pages.system.mika.title'),
+        description: t('settings.pages.system.mika.description'),
+        icon: 'i-solar:smartphone-bold-duotone',
+        to: '/settings/system/mika',
+      }]
+    : []),
   {
     title: t('settings.pages.system.permissions.title'),
     description: t('settings.pages.system.permissions.description'),

@@ -2318,6 +2318,28 @@ pages:
     general:
       description: 深色主题、语言等选项
       title: 通用
+    mika:
+      title: 手机操控
+      description: 让 AIRI 把任务交给手机上的 Mika 操作其他应用。
+      enabled:
+        label: 启用手机操控
+        description: AIRI 可以向 Mika 派任务，并在对话里读取结果。
+      base-url:
+        label: Mika 地址
+        description: 打开 Mika 的「连接电脑」，开启局域网模式，然后复制地址。
+      token:
+        label: 访问令牌
+        description: 在同一页面复制令牌。令牌只保存在这台设备上。
+      test:
+        label: 测试连接
+        testing: 测试中...
+        success: 已连接，服务器版本 {version}。
+        failed: 连接失败：{message}
+        missing: 请先填写地址和令牌。
+      native-only: 手机操控仅在 Android 应用中可用。
+      notice:
+        title: 开始之前
+        body: Mika 需要无障碍权限和后台虚拟屏。任务运行期间请保持 Mika 在后台。付款和确认步骤始终在手机上完成。
     permissions:
       description: 查看当前权限状态
       title: 权限管理
