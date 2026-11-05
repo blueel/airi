@@ -17,6 +17,15 @@ const config: CapacitorConfig = {
       }
     : undefined,
   android: {
+    // NOTICE:
+    // The app page runs on https://localhost, while the local Breeze-TTS and
+    // update servers are served over plain HTTP. Without this flag Android
+    // WebView blocks every request as mixed content and the provider reports
+    // "Failed to fetch".
+    // The app already allows cleartext traffic; the remaining gate is the
+    // WebView mixed-content policy.
+    // Removal condition: serve every local provider over HTTPS.
+    allowMixedContent: true,
     buildOptions: {
       keystorePath: env.CAPACITOR_ANDROID_KEYSTORE_PATH,
       keystoreAlias: env.CAPACITOR_ANDROID_KEYSTORE_ALIAS,
