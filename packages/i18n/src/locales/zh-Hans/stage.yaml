@@ -255,6 +255,23 @@ chat:
     read-failed: 识别失败
     ocr-failed: 本地 OCR 没能启动
     ocr-hint: 识别在本机完成（PaddleOCR + ONNX Runtime），不联网。
+    danmaku:
+      title: 弹幕直连
+      description: 直接连上 B 站直播间，弹幕和礼物实时到达，不用框选屏幕。
+      room-id: 房间号
+      room-id-hint: 直播间网址里的数字，例如 live.bilibili.com/21653665
+      cookie: B 站 Cookie（可选）
+      cookie-hint: 房间拒绝游客时，把浏览器里的 Cookie 粘贴过来
+      connect: 连接
+      disconnect: 断开
+      gifts-affect-mood: 礼物影响我的情绪
+      status-connecting: 连接中…
+      status-connected: 已连接
+      status-reconnecting: 重连中…
+      status-idle: 未连接
+      comments: '{count} 条弹幕'
+      gifts: '{count} 个礼物'
+      viewers: '{count} 人观看'
     ocr-loading-hint: 第一次要加载约 15 MB 模型，十几秒后就好了。
     message-header: 直播间观众正在说话：
     message-request: 挑一两条自然回应他们，不要逐条复述。

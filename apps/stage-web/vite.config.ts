@@ -104,6 +104,31 @@ export const memoryProxy: Record<string, ProxyOptions> = {
   },
 }
 
+/**
+ * Forwards the Bilibili danmaku API through whichever origin serves the app.
+ * The danmaku WebSocket itself connects cross-origin without trouble, but the
+ * `getDanmuInfo` request that yields the socket URL and token is blocked by
+ * CORS. Bilibili also reads the viewer cookie only from the standard `Cookie`
+ * header, so the page hands the pasted cookie over in `x-danmaku-cookie` and
+ * this proxy moves it into place before the request leaves for Bilibili.
+ */
+export const liveDanmakuProxy: Record<string, ProxyOptions> = {
+  '/api/live/danmu-info': {
+    target: 'https://api.live.bilibili.com',
+    changeOrigin: true,
+    rewrite: path => path.replace(/^\/api\/live\/danmu-info/, '/xlive/web-room/v1/index/getDanmuInfo'),
+    configure(proxy) {
+      proxy.on('proxyReq', (proxyReq, req) => {
+        const cookie = req.headers['x-danmaku-cookie']
+        if (typeof cookie === 'string' && cookie) {
+          proxyReq.setHeader('Cookie', cookie)
+          proxyReq.removeHeader('x-danmaku-cookie')
+        }
+      })
+    },
+  },
+}
+
 export default defineConfig({
   optimizeDeps: {
     exclude: [
@@ -143,7 +168,7 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: { ...breezeTtsProxy, ...ollamaProxy, ...memoryProxy },
+    proxy: { ...breezeTtsProxy, ...ollamaProxy, ...memoryProxy, ...liveDanmakuProxy },
     fs: {
       // To mute errors like:
       //   The request id ".../node_modules/@fontsource/sniglet/files/sniglet-latin-400-normal.woff" is outside of Vite serving allow list.

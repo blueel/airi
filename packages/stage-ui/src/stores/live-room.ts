@@ -287,6 +287,40 @@ export const useLiveRoomStore = defineStore('live-room', () => {
     return preparing
   }
 
+  /**
+   * Receives comments that a source other than the screen reader produced, for
+   * example the danmaku socket. They share the seen list, the panel, and the
+   * conversation. Resolves to the number of comments that reached the chat: 0
+   * means the turn is busy, and the caller keeps the comments for next time.
+   */
+  function pushExternalComments(incoming: LiveRoomComment[]) {
+    const fresh = selectFreshComments(incoming, seen)
+    if (!fresh.length)
+      return 0
+    const batch = fresh.slice(0, LIVE_ROOM_MAX_COMMENTS_PER_MESSAGE)
+    remember(batch)
+    recent.value = [...batch, ...recent.value].slice(0, LIVE_ROOM_RECENT_LIMIT)
+    received.value += batch.length
+    if (!sendToChat.value)
+      return batch.length
+
+    const chat = useChatStore()
+    const session = useChatSessionStore()
+    const sessionId = session.activeSessionId
+    if (!sessionId)
+      return 0
+    // Her reply is on its way. The caller keeps the comments, so they come next round instead of talking over her.
+    if (chat.activeTurns.some(turn => turn.sessionId === sessionId))
+      return 0
+
+    lastSentAt.value = Date.now()
+    void chat.notifyConversation(sessionId, {
+      source: LIVE_ROOM_NOTICE_SOURCE,
+      text: composeMessage(batch),
+    })
+    return batch.length
+  }
+
   /** Starts reading the region. Sharing, a usable region, and the local reader must all be there first. */
   async function startReading() {
     if (!stream.value) {
@@ -347,6 +381,7 @@ export const useLiveRoomStore = defineStore('live-room', () => {
     share,
     stopSharing,
     setRegion,
+    pushExternalComments,
     startReading,
     stopReading,
     toggleReading,

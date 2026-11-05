@@ -11,12 +11,14 @@ import {
   liveRoomRectFromPoints,
   liveRoomRectIsUsable,
 } from '../../../../libs/live-room'
+import { useLiveDanmakuStore } from '../../../../stores/live-danmaku'
 import { LIVE_ROOM_INTERVAL_OPTIONS, useLiveRoomStore } from '../../../../stores/live-room'
 
 const open = defineModel<boolean>({ default: false })
 
 const { t } = useI18n()
 const liveRoom = useLiveRoomStore()
+const danmaku = useLiveDanmakuStore()
 const {
   intervalMs,
   lastError,
@@ -31,6 +33,16 @@ const {
   sharing,
   stream,
 } = storeToRefs(liveRoom)
+const {
+  status: danmakuStatus,
+  lastError: danmakuError,
+  roomId: danmakuRoomId,
+  cookie: danmakuCookie,
+  giftsAffectMood: danmakuGiftsAffectMood,
+  commentsReceived: danmakuComments,
+  giftsReceived: danmakuGifts,
+  popularity: danmakuPopularity,
+} = storeToRefs(danmaku)
 
 const preview = useTemplateRef<HTMLVideoElement>('preview')
 const surface = useTemplateRef<HTMLElement>('surface')
@@ -66,6 +78,16 @@ const intervalOptions = LIVE_ROOM_INTERVAL_OPTIONS.map(value => ({
   value,
   label: t('stage.chat.live-room.interval-seconds', { seconds: value / 1000 }),
 }))
+
+const danmakuStatusLabel = computed(() => {
+  if (danmakuStatus.value === 'connected')
+    return t('stage.chat.live-room.danmaku.status-connected')
+  if (danmakuStatus.value === 'connecting')
+    return t('stage.chat.live-room.danmaku.status-connecting')
+  if (danmakuStatus.value === 'reconnecting')
+    return t('stage.chat.live-room.danmaku.status-reconnecting')
+  return t('stage.chat.live-room.danmaku.status-idle')
+})
 
 function attachPreview() {
   const video = preview.value
@@ -292,6 +314,75 @@ function handleClearRegion() {
               {{ t('stage.chat.live-room.send-to-chat') }}
             </label>
           </div>
+        </div>
+
+        <!-- The danmaku socket of a Bilibili room: the source that needs no screen. -->
+        <div :class="['mt-4 rounded-2xl bg-white/70 p-3 dark:bg-neutral-800/50']">
+          <div :class="['flex items-center gap-2']">
+            <h3 :class="['text-xs font-semibold text-neutral-600 dark:text-neutral-300']">
+              {{ t('stage.chat.live-room.danmaku.title') }}
+            </h3>
+            <span :class="['ml-auto text-[11px] text-neutral-400']">{{ danmakuStatusLabel }}</span>
+          </div>
+          <p :class="['mt-0.5 text-[11px] text-neutral-400']">
+            {{ t('stage.chat.live-room.danmaku.description') }}
+          </p>
+
+          <div :class="['mt-2 flex flex-col gap-2 sm:flex-row']">
+            <input
+              v-model="danmakuRoomId"
+              inputmode="numeric"
+              autocomplete="off"
+              :placeholder="t('stage.chat.live-room.danmaku.room-id')"
+              :class="[
+                'h-9 flex-1 rounded-xl bg-white px-3 text-sm text-neutral-800 outline-none',
+                'border border-neutral-200 focus:border-primary-400 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100',
+              ]"
+            >
+            <BasicButton
+              :class="[
+                'h-9 min-w-24 rounded-full px-4 text-sm font-medium',
+                danmakuStatus === 'connected' || danmakuStatus === 'connecting'
+                  ? 'bg-neutral-200/70 text-neutral-700 dark:bg-neutral-700/60 dark:text-neutral-100'
+                  : 'bg-primary-500 text-white hover:bg-primary-600',
+              ]"
+              @click="danmaku.toggle()"
+            >
+              {{ danmakuStatus === 'connected' || danmakuStatus === 'connecting'
+                ? t('stage.chat.live-room.danmaku.disconnect')
+                : t('stage.chat.live-room.danmaku.connect') }}
+            </BasicButton>
+          </div>
+
+          <input
+            v-model="danmakuCookie"
+            type="password"
+            autocomplete="off"
+            :placeholder="t('stage.chat.live-room.danmaku.cookie')"
+            :class="[
+              'mt-2 h-9 w-full rounded-xl bg-white px-3 text-sm text-neutral-800 outline-none',
+              'border border-neutral-200 focus:border-primary-400 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100',
+            ]"
+          >
+          <p :class="['mt-1 text-[11px] text-neutral-400']">
+            {{ t('stage.chat.live-room.danmaku.room-id-hint') }} {{ t('stage.chat.live-room.danmaku.cookie-hint') }}
+          </p>
+
+          <div :class="['mt-2 flex flex-wrap items-center gap-3 text-[11px] text-neutral-500 dark:text-neutral-400']">
+            <span v-if="danmakuStatus === 'connected' && danmakuPopularity">
+              {{ t('stage.chat.live-room.danmaku.viewers', { count: danmakuPopularity }) }}
+            </span>
+            <span v-if="danmakuComments">{{ t('stage.chat.live-room.danmaku.comments', { count: danmakuComments }) }}</span>
+            <span v-if="danmakuGifts">{{ t('stage.chat.live-room.danmaku.gifts', { count: danmakuGifts }) }}</span>
+            <label :class="['ml-auto flex items-center gap-1.5']">
+              <input v-model="danmakuGiftsAffectMood" type="checkbox" :class="['size-3.5']">
+              {{ t('stage.chat.live-room.danmaku.gifts-affect-mood') }}
+            </label>
+          </div>
+
+          <p v-if="danmakuError" role="alert" :class="['mt-2 text-xs text-red-600 dark:text-red-400']">
+            {{ danmakuError }}
+          </p>
         </div>
 
         <p v-if="lastError" role="alert" :class="['mt-3 text-xs text-red-600 dark:text-red-400']">

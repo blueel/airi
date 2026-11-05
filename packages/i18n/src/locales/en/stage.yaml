@@ -248,6 +248,23 @@ chat:
     read-failed: Could not read the screen
     ocr-failed: The local OCR could not start
     ocr-hint: Recognition runs on this machine (PaddleOCR on ONNX Runtime) and never goes online.
+    danmaku:
+      title: Danmaku socket
+      description: Connect to the Bilibili room directly. Comments and gifts arrive in real time, no screen to read.
+      room-id: Room ID
+      room-id-hint: The number in the room URL, for example live.bilibili.com/21653665
+      cookie: Bilibili cookie (optional)
+      cookie-hint: Paste the browser cookie when the room refuses guests
+      connect: Connect
+      disconnect: Disconnect
+      gifts-affect-mood: Gifts move my mood
+      status-connecting: Connecting…
+      status-connected: Connected
+      status-reconnecting: Reconnecting…
+      status-idle: Not connected
+      comments: '{count} comments'
+      gifts: '{count} gifts'
+      viewers: '{count} watching'
     ocr-loading-hint: The first read loads about 15 MB of models, which takes a few seconds.
     message-header: 'Viewers in the live room are saying:'
     message-request: Answer one or two of them naturally, without repeating each line.
