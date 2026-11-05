@@ -91,6 +91,26 @@ export const ollamaProxy: Record<string, ProxyOptions> = {
 }
 
 /**
+ * Forwards the Strata OpenAI-compatible API through whichever origin serves the
+ * app, for the same reason as `ollamaProxy`.
+ *
+ * The Strata server sends no `Access-Control-Allow-Origin` header, so a browser
+ * page cannot call `http://localhost:8100` directly: the model list and chat
+ * requests fail with `Failed to fetch`. The proxy is same-origin to the page,
+ * so no CORS headers are needed on the server.
+ *
+ * Point the provider base URL at `${location.origin}/strata/v1/` in the
+ * browser. The desktop app can keep using the loopback address directly.
+ */
+export const strataProxy: Record<string, ProxyOptions> = {
+  '/strata': {
+    target: 'http://127.0.0.1:8100',
+    changeOrigin: true,
+    rewrite: path => path.replace(/^\/strata/, ''),
+  },
+}
+
+/**
  * Forwards the local memory service through whichever origin serves the app.
  * A page opened over HTTPS cannot call the plain HTTP loopback port, and a
  * phone cannot reach the computer's loopback at all. The default client address
@@ -168,7 +188,7 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: { ...breezeTtsProxy, ...ollamaProxy, ...memoryProxy, ...liveDanmakuProxy },
+    proxy: { ...breezeTtsProxy, ...ollamaProxy, ...strataProxy, ...memoryProxy, ...liveDanmakuProxy },
     fs: {
       // To mute errors like:
       //   The request id ".../node_modules/@fontsource/sniglet/files/sniglet-latin-400-normal.woff" is outside of Vite serving allow list.

@@ -13,6 +13,7 @@ const localApiProviderIds = new Set([
   'lm-studio',
   'ollama',
   'player2-speech',
+  'strata',
   'voicevox',
 ])
 const localRunProviderIds = new Set([

@@ -77,6 +77,32 @@ const LEGACY_BREEZE_BASE_URLS = new Set([
   'http://localhost:9310/',
 ])
 
+const STRATA = {
+  providerId: 'strata',
+  /**
+   * Forwarded to the loopback Strata server by the dev and preview servers.
+   * The Strata server sends no CORS headers, so a browser page cannot call the
+   * loopback port directly; through the proxy the request is same-origin.
+   * Resolved against `location.origin` rather than stored as a bare path,
+   * because the provider builds a `URL` from this value and relative paths
+   * throw `Invalid base URL`. The desktop app has no proxy and keeps using the
+   * loopback address directly.
+   */
+  proxyPath: '/strata/v1/',
+  defaultModel: 'qwen3.8-flash-next-iq2_xs',
+} as const
+
+/** Loopback base URLs the schema default seeded, replaced in place by the proxy path. */
+const LEGACY_STRATA_BASE_URLS = new Set([
+  'http://localhost:8100/v1/',
+  'http://localhost:8100/v1',
+  'http://127.0.0.1:8100/v1/',
+  'http://127.0.0.1:8100/v1',
+  // Bare proxy path: throws on the provider's `new URL(...)`.
+  '/strata/v1/',
+  '/strata/v1',
+])
+
 function readJson(storage: Storage, key: string): unknown {
   const raw = storage.getItem(key)
   if (!raw)
@@ -369,6 +395,109 @@ function seedBreezeSpeechProvider() {
   }
 }
 
+/**
+ * Seeds the local Strata chat provider so the machine-local model can be used
+ * without opening the provider form first.
+ *
+ * A profile that added the provider before the proxy existed holds the
+ * loopback schema default, which a browser page cannot fetch from (the Strata
+ * server sends no CORS headers). That exact value is rewritten to the
+ * origin-resolved proxy path once; any other address is the user's own and is
+ * left alone. A missing model is filled so the consciousness module has a
+ * selection without walking through the model picker.
+ */
+function seedStrataProvider() {
+  if (!isEnvTruthy(import.meta.env.VITE_DEFAULT_STRATA))
+    return
+
+  const configuredBaseUrl = import.meta.env.VITE_DEFAULT_STRATA_BASE_URL
+  // An explicit absolute address wins; otherwise derive it from whichever
+  // origin serves this page. Every origin keeps its own localStorage, so the
+  // dev server and the public HTTPS link each store an address that reaches
+  // their own proxy.
+  const baseUrl = isNonEmptyString(configuredBaseUrl) && /^https?:\/\//i.test(configuredBaseUrl)
+    ? configuredBaseUrl
+    : `${globalThis.location.origin}${STRATA.proxyPath}`
+  const model = import.meta.env.VITE_DEFAULT_STRATA_MODEL || STRATA.defaultModel
+
+  const configured = readJson(localStorage, STORAGE_KEY.configuredProviders)
+  const providers = configured && typeof configured === 'object' && !Array.isArray(configured)
+    ? configured as Record<string, unknown>
+    : {}
+
+  if (!providers[STRATA.providerId]) {
+    providers[STRATA.providerId] = {
+      id: STRATA.providerId,
+      definitionId: STRATA.providerId,
+      config: {
+        baseUrl,
+        model,
+      },
+      status: 'configured',
+      configuredBy: 'user',
+    }
+    writeJson(localStorage, STORAGE_KEY.configuredProviders, providers)
+  }
+  else if (typeof providers[STRATA.providerId] === 'object' && !Array.isArray(providers[STRATA.providerId])) {
+    const entry = providers[STRATA.providerId] as { config?: unknown }
+    const config = entry.config && typeof entry.config === 'object' && !Array.isArray(entry.config)
+      ? entry.config as Record<string, unknown>
+      : {}
+    let changed = false
+    if (!isNonEmptyString(config.baseUrl)) {
+      config.baseUrl = baseUrl
+      changed = true
+    }
+    else if (LEGACY_STRATA_BASE_URLS.has(config.baseUrl.trim())) {
+      config.baseUrl = baseUrl
+      changed = true
+    }
+    if (!isNonEmptyString(config.model)) {
+      config.model = model
+      changed = true
+    }
+    if (changed) {
+      entry.config = config
+      writeJson(localStorage, STORAGE_KEY.configuredProviders, providers)
+    }
+  }
+
+  const added = readJson(localStorage, STORAGE_KEY.addedProviders)
+  const addedProviders = added && typeof added === 'object' && !Array.isArray(added)
+    ? added as Record<string, unknown>
+    : {}
+  if (!addedProviders[STRATA.providerId]) {
+    addedProviders[STRATA.providerId] = true
+    writeJson(localStorage, STORAGE_KEY.addedProviders, addedProviders)
+  }
+
+  // Claiming the chat selection is opt-in, so a profile that already chats
+  // through another provider keeps its choice.
+  if (isEnvTruthy(import.meta.env.VITE_DEFAULT_STRATA_ACTIVE)) {
+    writeRawString(localStorage, STORAGE_KEY.activeProvider, STRATA.providerId)
+    writeRawString(localStorage, STORAGE_KEY.activeModel, model)
+  }
+
+  // A character inherits this snapshot unless its card sets a selection, and
+  // the chat turn reads it per character, not the active selection above. A
+  // provider-only default (picked while the model list still failed) surfaces
+  // as `No chat provider or model configured for this character`.
+  const moduleDefaults = readJson(localStorage, SPEECH_STORAGE_KEY.moduleDefaults)
+  if (moduleDefaults && typeof moduleDefaults === 'object' && !Array.isArray(moduleDefaults)) {
+    const defaults = moduleDefaults as { consciousness?: unknown }
+    const consciousness = defaults.consciousness && typeof defaults.consciousness === 'object' && !Array.isArray(defaults.consciousness)
+      ? defaults.consciousness as Record<string, unknown>
+      : {}
+    const provider = consciousness.provider
+    const inheritsStrata = !isNonEmptyString(provider) || provider === STRATA.providerId
+    // Fill only the missing model; a provider the user chose is left alone.
+    if (inheritsStrata && !isNonEmptyString(consciousness.model)) {
+      defaults.consciousness = { ...consciousness, provider: STRATA.providerId, model }
+      writeJson(localStorage, SPEECH_STORAGE_KEY.moduleDefaults, defaults)
+    }
+  }
+}
+
 export function seedDefaultProvider() {
   if (typeof localStorage === 'undefined')
     return
@@ -386,6 +515,13 @@ export function seedDefaultProvider() {
   }
   catch (error) {
     console.error('Failed to seed the local Ollama provider:', error)
+  }
+
+  try {
+    seedStrataProvider()
+  }
+  catch (error) {
+    console.error('Failed to seed the local Strata provider:', error)
   }
 
   try {

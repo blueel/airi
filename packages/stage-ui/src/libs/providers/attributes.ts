@@ -101,6 +101,7 @@ const providerAttributesById = {
   'player2-speech': freeLocal,
   'runcrate': paidCloud,
   'speech-noop': false,
+  'strata': freeLocal,
   'together-ai': paidCloud,
   'voicevox': freeLocal,
   'volcengine': paidCloud,

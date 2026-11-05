@@ -2185,6 +2185,9 @@ pages:
         app-missing:
           download: '请下载并运行 Player2 应用：{link}'
           support: '安装后如果问题仍然存在，请在 Discord 联系我们：{link}'
+      strata:
+        description: Strata 本地服务器（OpenAI 兼容）
+        title: Strata
       volcengine:
         fields:
           field:

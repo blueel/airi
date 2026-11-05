@@ -58,6 +58,7 @@ import { providerLmStudio } from './local/lm-studio'
 import { providerOllama } from './local/ollama'
 import { providerPlayer2Speech } from './local/player2-speech'
 import { providerSpeechNoop } from './local/speech-noop'
+import { providerStrata } from './local/strata'
 import { providerAivisSpeech, providerVoicevox } from './local/voicevox'
 
 /**
@@ -145,6 +146,7 @@ export const portableProviderDefinitions = eraseProviderDefinitions(
   providerOllama,
   providerPlayer2Speech,
   providerSpeechNoop,
+  providerStrata,
   providerAivisSpeech,
   providerVoicevox,
 )

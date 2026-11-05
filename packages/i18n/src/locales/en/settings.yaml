@@ -2365,6 +2365,9 @@ pages:
       lm-studio:
         description: lmstudio.ai
         title: LM Studio
+      strata:
+        description: Strata local server (OpenAI-compatible)
+        title: Strata
       vllm:
         description: vllm.ai
         title: vLLM
