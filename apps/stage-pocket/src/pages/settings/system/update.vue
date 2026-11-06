@@ -11,6 +11,7 @@ import { useI18n } from 'vue-i18n'
 
 import {
   AppUpdater,
+  AUTO_INSTALL_KEY,
   DEFAULT_UPDATE_MANIFEST_URL,
   UPDATE_MANIFEST_URL_KEY,
 } from '../../../modules/app-updater'
@@ -19,6 +20,9 @@ const { t } = useI18n()
 
 const manifestUrl = useLocalStorage(UPDATE_MANIFEST_URL_KEY, DEFAULT_UPDATE_MANIFEST_URL)
 const isNative = Capacitor.isNativePlatform()
+const isAndroid = Capacitor.getPlatform() === 'android'
+const autoInstall = useLocalStorage(AUTO_INSTALL_KEY, true)
+const autoConfirmEnabled = ref(false)
 
 const currentVersion = ref('')
 const result = ref<UpdateCheckResult | null>(null)
@@ -36,6 +40,8 @@ onMounted(async () => {
   if (!isNative)
     return
 
+  document.addEventListener('visibilitychange', onVisibilityChange)
+
   progressListener = await AppUpdater.addListener('downloadProgress', (payload) => {
     progress.value = payload
   })
@@ -47,9 +53,12 @@ onMounted(async () => {
   catch (cause) {
     error.value = errorMessageFrom(cause) ?? 'Unknown error'
   }
+
+  await refreshInstallState()
 })
 
 onUnmounted(async () => {
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   await progressListener?.remove()
 })
 
@@ -116,6 +125,9 @@ async function downloadUpdate() {
   finally {
     downloading.value = false
   }
+
+  if (downloaded.value && autoInstall.value && isAndroid)
+    await installUpdate()
 }
 
 async function installUpdate() {
@@ -133,6 +145,60 @@ async function installUpdate() {
   finally {
     installing.value = false
   }
+}
+
+/** Reads whether the owner enabled the accessibility service that taps the install button. */
+async function refreshInstallState() {
+  if (!isAndroid)
+    return
+  try {
+    const status = await AppUpdater.autoInstallStatus()
+    autoConfirmEnabled.value = status.accessibilityEnabled
+  }
+  catch (cause) {
+    console.warn('Could not read the auto-install state:', errorMessageFrom(cause) ?? 'unknown error')
+  }
+}
+
+async function openAccessibilitySettings() {
+  try {
+    await AppUpdater.openAccessibilitySettings()
+  }
+  catch (cause) {
+    error.value = messageOf(cause)
+  }
+}
+
+async function openAppSettings() {
+  try {
+    await AppUpdater.openAppSettings()
+  }
+  catch (cause) {
+    error.value = messageOf(cause)
+  }
+}
+
+/** After the owner grants "install unknown apps", finish the install without another tap. */
+async function retryInstallAfterPermission() {
+  if (!needsInstallPermission.value || !downloaded.value || installing.value)
+    return
+  try {
+    const permission = await AppUpdater.canInstall()
+    if (!permission.canInstall)
+      return
+    needsInstallPermission.value = false
+    await installUpdate()
+  }
+  catch (cause) {
+    error.value = messageOf(cause)
+  }
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState !== 'visible')
+    return
+  void refreshInstallState()
+  void retryInstallAfterPermission()
 }
 </script>
 
@@ -183,6 +249,60 @@ async function installUpdate() {
       <p v-if="!isNative" :class="['text-xs text-amber-600 dark:text-amber-400']">
         {{ t('settings.pages.system.update.native-only') }}
       </p>
+
+      <div
+        v-if="isAndroid"
+        :class="['flex flex-col gap-3 rounded-xl p-3', 'bg-white dark:bg-neutral-900']"
+      >
+        <label :class="['flex items-start gap-3']">
+          <input v-model="autoInstall" type="checkbox" :class="['mt-0.5 h-4 w-4']">
+          <span :class="['flex flex-col gap-0.5']">
+            <span :class="['text-sm font-medium']">
+              {{ t('settings.pages.system.update.auto-install.label') }}
+            </span>
+            <span :class="['text-xs text-neutral-500 dark:text-neutral-400']">
+              {{ t('settings.pages.system.update.auto-install.description') }}
+            </span>
+          </span>
+        </label>
+
+        <div :class="['flex items-center justify-between gap-3']">
+          <span :class="['text-sm font-medium']">
+            {{ t('settings.pages.system.update.auto-confirm.label') }}
+          </span>
+          <span :class="autoConfirmEnabled ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'">
+            {{ autoConfirmEnabled ? t('settings.pages.system.update.auto-confirm.enabled') : t('settings.pages.system.update.auto-confirm.disabled') }}
+          </span>
+        </div>
+        <p :class="['text-xs text-neutral-500 dark:text-neutral-400']">
+          {{ t('settings.pages.system.update.auto-confirm.description') }}
+        </p>
+        <div :class="['flex flex-wrap gap-2']">
+          <button
+            :class="[
+              'rounded-lg px-3 py-1.5 text-xs font-medium',
+              'bg-neutral-200 text-neutral-700 active:bg-neutral-300',
+              'dark:bg-neutral-800 dark:text-neutral-200 dark:active:bg-neutral-700',
+            ]"
+            @click="openAccessibilitySettings"
+          >
+            {{ t('settings.pages.system.update.auto-confirm.open') }}
+          </button>
+          <button
+            :class="[
+              'rounded-lg px-3 py-1.5 text-xs font-medium',
+              'bg-neutral-200 text-neutral-700 active:bg-neutral-300',
+              'dark:bg-neutral-800 dark:text-neutral-200 dark:active:bg-neutral-700',
+            ]"
+            @click="openAppSettings"
+          >
+            {{ t('settings.pages.system.update.auto-confirm.open-app-settings') }}
+          </button>
+        </div>
+        <p v-if="!autoConfirmEnabled" :class="['text-xs text-amber-600 dark:text-amber-400']">
+          {{ t('settings.pages.system.update.auto-confirm.restricted') }}
+        </p>
+      </div>
     </div>
 
     <div

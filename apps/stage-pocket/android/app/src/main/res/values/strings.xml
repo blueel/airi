@@ -12,4 +12,6 @@
     <string name="floating_bubble_overlay_denied">Allow AIRI to display over other apps, then try again.</string>
     <string name="floating_bubble_capture_denied">Screen capture permission was denied.</string>
     <string name="floating_bubble_start_failed">Could not start the screen bubble.</string>
+    <string name="install_accessibility_label">AIRI auto install</string>
+    <string name="install_accessibility_description">Taps the install button in the system package installer for AIRI updates. Android does not allow a normal app to install an update silently.</string>
 </resources>

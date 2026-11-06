@@ -68,6 +68,38 @@ class AppUpdaterPlugin : Plugin() {
         call.resolve(result)
     }
 
+    /** Reports whether Android lets this app open the package installer. */
+    @PluginMethod
+    fun canInstall(call: PluginCall) {
+        val allowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
+        call.resolve(JSObject().put("canInstall", allowed))
+    }
+
+    /** Reports whether the owner enabled the accessibility service that taps the install button. */
+    @PluginMethod
+    fun autoInstallStatus(call: PluginCall) {
+        call.resolve(JSObject().put("accessibilityEnabled", isAccessibilityServiceEnabled()))
+    }
+
+    /** Opens the accessibility settings list, where the owner enables AIRI's auto-install service. */
+    @PluginMethod
+    fun openAccessibilitySettings(call: PluginCall) {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        activity.startActivity(intent)
+        call.resolve()
+    }
+
+    /** Opens the app info screen, where Android 13 and later allow restricted settings for a sideloaded app. */
+    @PluginMethod
+    fun openAppSettings(call: PluginCall) {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .setData(Uri.parse("package:${context.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        activity.startActivity(intent)
+        call.resolve()
+    }
+
     @PluginMethod
     fun check(call: PluginCall) {
         val manifestUrl = call.getString("url")?.trim().orEmpty()
@@ -212,6 +244,8 @@ class AppUpdaterPlugin : Plugin() {
                 .setDataAndType(uri, "application/vnd.android.package-archive")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // The accessibility service may tap the confirmation for this short window only.
+            InstallGate.arm(context)
             activity.startActivity(intent)
 
             val result = JSObject()
@@ -221,6 +255,15 @@ class AppUpdaterPlugin : Plugin() {
         catch (error: Exception) {
             call.reject(error.message ?: "Could not start the package installer.", error)
         }
+    }
+
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val expected = "${context.packageName}/${InstallAccessibilityService::class.java.name}"
+        val enabled = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ) ?: return false
+        return enabled.split(':').any { it.equals(expected, ignoreCase = true) }
     }
 
     private fun notifyProgress(received: Long, total: Long) {

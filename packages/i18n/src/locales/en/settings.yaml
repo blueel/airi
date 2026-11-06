@@ -2635,7 +2635,18 @@ pages:
       downloaded: Update downloaded ({size}).
       install: Install update
       installing: Opening the installer...
-      install-permission: Allow installing unknown apps for AIRI, then tap Install again.
+      install-permission: Allow installing unknown apps for AIRI. The install continues when you return.
+      auto-install:
+        label: Install after download
+        description: Open the system installer as soon as the update finishes downloading.
+      auto-confirm:
+        label: Confirm install automatically
+        enabled: On
+        disabled: Off
+        description: Android does not allow a normal app to install silently. This accessibility service taps the install button in the system installer for you.
+        open: Open accessibility settings
+        open-app-settings: Open AIRI app info
+        restricted: If Android shows a restricted setting, allow restricted settings for AIRI in the app info first.
       native-only: Updates are only available in the Android app.
       failed: 'Update failed: {message}'
     description: Adjust app preferences, appearance, and device controls.

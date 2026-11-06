@@ -2428,7 +2428,18 @@ pages:
       downloaded: 更新已下载（{size}）
       install: 安装更新
       installing: 正在打开安装器...
-      install-permission: 请先允许 AIRI 安装未知应用，然后再次点击安装。
+      install-permission: 请允许 AIRI 安装未知应用，返回后会自动继续安装。
+      auto-install:
+        label: 下载完成后自动安装
+        description: 更新包下载完成后直接打开系统安装界面。
+      auto-confirm:
+        label: 自动确认安装
+        enabled: 已开启
+        disabled: 未开启
+        description: Android 不允许普通应用完全静默安装。开启这个无障碍服务后，AIRI 会自动点击系统安装界面的「安装」按钮。
+        open: 打开无障碍设置
+        open-app-settings: 打开 AIRI 应用信息
+        restricted: 如果 Android 提示「受限设置」，请先在应用信息里允许 AIRI 的受限设置。
       native-only: 更新功能仅在 Android 应用中可用。
       failed: 更新失败：{message}
     description: 调整应用偏好、外观和设备控制。

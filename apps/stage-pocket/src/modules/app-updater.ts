@@ -26,6 +26,10 @@ export interface AppUpdaterPlugin {
   check: (options: { url: string }) => Promise<UpdateCheckResult>
   download: (options: { url: string, sha256?: string }) => Promise<{ path: string, bytes: number, sha256: string }>
   install: () => Promise<{ launched: boolean, needsPermission?: boolean }>
+  canInstall: () => Promise<{ canInstall: boolean }>
+  autoInstallStatus: () => Promise<{ accessibilityEnabled: boolean }>
+  openAccessibilitySettings: () => Promise<void>
+  openAppSettings: () => Promise<void>
   addListener: (
     eventName: 'downloadProgress',
     listener: (payload: { received: number, total: number }) => void,
@@ -37,3 +41,4 @@ export const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater')
 /** Native APK updates are served by the owner's frp tunnel. */
 export const DEFAULT_UPDATE_MANIFEST_URL = 'http://airi.example/latest.json'
 export const UPDATE_MANIFEST_URL_KEY = 'settings/system/update-manifest-url'
+export const AUTO_INSTALL_KEY = 'settings/system/auto-install'
