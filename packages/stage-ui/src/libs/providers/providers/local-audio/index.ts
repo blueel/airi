@@ -1,7 +1,5 @@
 import type { ComposerTranslation } from 'vue-i18n'
 
-import { isStageTamagotchi } from '@proj-airi/stage-shared'
-import { isWebGPUSupported } from '@proj-airi/stage-shared/webgpu'
 import { createOpenAI } from '@xsai-ext/providers/create'
 import { z } from 'zod'
 
@@ -72,18 +70,12 @@ function createLocalAudioValidators() {
   }
 }
 
-async function isBrowserAndMemoryEnough() {
-  if (isStageTamagotchi())
-    return false
-
-  if (await isWebGPUSupported())
-    return true
-
-  if ('navigator' in globalThis && globalThis.navigator != null && 'deviceMemory' in globalThis.navigator && typeof globalThis.navigator.deviceMemory === 'number') {
-    // The browser model needs at least 8 GB of system memory without WebGPU.
-    return globalThis.navigator.deviceMemory >= 8
-  }
-
+// NOTICE:
+// The settings pages of these providers still render <WIP />, so a user cannot configure them.
+// Showing the providers lets a user select one that cannot work.
+// Reported in https://github.com/moeru-ai/airi/issues/2297 (item 6).
+// Removal condition: restore a real availability check once the settings pages are implemented.
+function isSettingsPageReady() {
   return false
 }
 
@@ -95,7 +87,7 @@ export const providerAppLocalAudioSpeech = defineProvider<LocalAudioConfig, 'app
   descriptionLocalize: ({ t }) => t('settings.pages.providers.provider.app-local-audio-speech.description'),
   tasks: ['text-to-speech', 'tts'],
   icon: 'i-lobe-icons:huggingface',
-  isAvailableBy: isStageTamagotchi,
+  isAvailableBy: isSettingsPageReady,
   createProviderConfig: ({ t }) => createLocalAudioConfigSchema(t),
   createProvider: createLocalAudioProvider,
   validators: createLocalAudioValidators(),
@@ -109,7 +101,7 @@ export const providerAppLocalAudioTranscription = defineProvider<LocalAudioConfi
   descriptionLocalize: ({ t }) => t('settings.pages.providers.provider.app-local-audio-transcription.description'),
   tasks: ['speech-to-text', 'automatic-speech-recognition', 'asr', 'stt'],
   icon: 'i-lobe-icons:huggingface',
-  isAvailableBy: isStageTamagotchi,
+  isAvailableBy: isSettingsPageReady,
   capabilities: {
     transcription: {
       protocol: 'http',
@@ -131,7 +123,7 @@ export const providerBrowserLocalAudioSpeech = defineProvider<LocalAudioConfig, 
   descriptionLocalize: ({ t }) => t('settings.pages.providers.provider.browser-local-audio-speech.description'),
   tasks: ['text-to-speech', 'tts'],
   icon: 'i-lobe-icons:huggingface',
-  isAvailableBy: isBrowserAndMemoryEnough,
+  isAvailableBy: isSettingsPageReady,
   createProviderConfig: ({ t }) => createLocalAudioConfigSchema(t),
   createProvider: createLocalAudioProvider,
   validators: createLocalAudioValidators(),
@@ -145,12 +137,7 @@ export const providerBrowserLocalAudioTranscription = defineProvider<LocalAudioC
   descriptionLocalize: ({ t }) => t('settings.pages.providers.provider.browser-local-audio-transcription.description'),
   tasks: ['speech-to-text', 'automatic-speech-recognition', 'asr', 'stt'],
   icon: 'i-lobe-icons:huggingface',
-  // NOTICE:
-  // Hiding the provider keeps users from selecting one they cannot configure.
-  // Its settings page (browser-local-audio-transcription.vue) renders <WIP />.
-  // Reported in https://github.com/moeru-ai/airi/issues/2297 (item 6).
-  // Removal condition: restore isBrowserAndMemoryEnough once the settings page is implemented.
-  isAvailableBy: () => false,
+  isAvailableBy: isSettingsPageReady,
   capabilities: {
     transcription: {
       protocol: 'http',

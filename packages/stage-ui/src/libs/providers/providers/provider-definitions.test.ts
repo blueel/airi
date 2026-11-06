@@ -29,16 +29,21 @@ function getRequiredProvider(id: string) {
 describe('migrated provider definitions', () => {
   // ROOT CAUSE:
   //
-  // The provider followed the shared browser capability helper, so it showed up
-  // available on a capable browser, while its settings page was still a
-  // placeholder.
+  // The providers followed shared capability helpers, so they showed up
+  // available on a capable device, while their settings pages were still
+  // placeholders.
   //
-  // Before, isAvailableBy: isBrowserAndMemoryEnough.
+  // Before, isAvailableBy was isBrowserAndMemoryEnough or isStageTamagotchi.
   //
-  // We fixed this by overriding it with a fixed false for this provider only.
+  // We fixed this by overriding it with a fixed false for these providers.
   // https://github.com/moeru-ai/airi/issues/2297
-  it('hides the browser local transcription provider until its settings page exists (Issue #2297)', async () => {
-    expect(await providerBrowserLocalAudioTranscription.isAvailableBy?.()).toBe(false)
+  it.each([
+    ['app local speech', providerAppLocalAudioSpeech],
+    ['app local transcription', providerAppLocalAudioTranscription],
+    ['browser local speech', providerBrowserLocalAudioSpeech],
+    ['browser local transcription', providerBrowserLocalAudioTranscription],
+  ])('hides the %s provider until its settings page exists (Issue #2297)', async (_, provider) => {
+    expect(await provider.isAvailableBy?.()).toBe(false)
   })
 
   it('exposes a closed provider id union to stage-ui consumers', () => {
