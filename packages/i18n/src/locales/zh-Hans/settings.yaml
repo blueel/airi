@@ -1,5 +1,15 @@
 common:
   save: 保存
+groups:
+  character:
+    title: 角色与外观
+    description: 角色卡、身体模型和场景背景。
+  ai:
+    title: AI 与能力
+    description: AIRI 能做什么，以及背后的服务商。
+  app:
+    title: 应用与系统
+    description: 连接、本地数据和应用偏好。
 animations:
   stage-transitions:
     title: 禁用舞台切换动画
@@ -790,6 +800,10 @@ pages:
       messaging: 消息
       gaming: 游戏
       artistry: 绘图
+    categoryDescriptions:
+      essential: 选择 AIRI 如何思考、说话、聆听和记忆。
+      messaging: 在其他应用里与 AIRI 聊天。
+      gaming: 让 AIRI 参与你的游戏。
     consciousness:
       description: 人格设定、使用的模型等配置
       sections:
@@ -832,7 +846,7 @@ pages:
               required-description: 此模型必须启用思考。
               provider-default-description: AIRI 未提供此模型的推理设置，将使用 OpenRouter 的默认设置。
       title: 意识
-    description: 思维，视觉，言语综合，游戏等
+    description: 选择 AIRI 能做什么，并配置每项能力。
     gaming-factorio:
       description: 一起玩 Factorio！
       title: 异星工厂 Factorio
@@ -1869,7 +1883,7 @@ pages:
       Speech: 语音（文本转语音）模型服务来源，例如 ElevenLabs, Azure Speech
       Transcription: >-
         转录（语音转文本）模型服务来源，例如 Whisper.cpp, OpenAI, Azure Speech
-    description: LLM，语音合成，语音识别服务来源等
+    description: 为聊天、视觉、语音和绘图服务配置提供商。
     provider:
       sherpaw-transcription:
         description: 使用内置或按需加载的模型进行本地语音识别，无需 API 密钥。
@@ -2280,6 +2294,16 @@ pages:
         title: 二维码扫描失败
         failed: 扫描或连接二维码失败。
   system:
+    groups:
+      basics:
+        title: 基础
+        description: 主题、语言和颜色。
+      device:
+        title: 当前设备
+        description: 此设备提供的控制项。
+      advanced:
+        title: 高级
+        description: 开发者与实验性选项。
     experimental:
       refresh: 刷新策略
       title: 实验性特性
@@ -2362,7 +2386,7 @@ pages:
       install-permission: 请先允许 AIRI 安装未知应用，然后再次点击安装。
       native-only: 更新功能仅在 Android 应用中可用。
       failed: 更新失败：{message}
-    description: 自定义你的舞台外观！
+    description: 调整应用偏好、外观和设备控制。
     sections:
       section:
         custom-color:

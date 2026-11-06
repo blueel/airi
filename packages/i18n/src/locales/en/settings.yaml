@@ -1,5 +1,15 @@
 common:
   save: Save
+groups:
+  character:
+    title: Your character
+    description: Character cards, body models, and scene backgrounds.
+  ai:
+    title: AI services
+    description: What AIRI can do, and the providers behind it.
+  app:
+    title: App
+    description: Connection, local data, and app preferences.
 animations:
   stage-transitions:
     title: Disable Stage Transitions
@@ -843,6 +853,10 @@ pages:
       messaging: Messaging
       gaming: Gaming
       artistry: Artistry
+    categoryDescriptions:
+      essential: Choose how AIRI thinks, speaks, hears, and remembers.
+      messaging: Talk with AIRI from other apps.
+      gaming: Let AIRI join your games.
     consciousness:
       description: Personality, desired model, etc.
       sections:
@@ -886,7 +900,7 @@ pages:
               required-description: This model requires Thinking.
               provider-default-description: AIRI has no reasoning settings for this model. OpenRouter applies its default.
       title: Consciousness
-    description: Thinking, vision, speech synthesis, gaming, etc.
+    description: Choose what AIRI can do, and how each capability works.
     gaming-factorio:
       description: Playing Factorio!
       title: Factorio
@@ -1956,7 +1970,7 @@ pages:
       Transcription: >-
         Transcription (speech-to-text) model providers. e.g. Whisper.cpp,
         OpenAI, Azure Speech
-    description: LLMs, speech providers, etc.
+    description: Connect AIRI to chat, vision, speech, and image services.
     provider:
       sherpaw-transcription:
         title: Sherpaw
@@ -2487,6 +2501,16 @@ pages:
         title: QR scan failed
         failed: Failed to scan or connect with the QR code.
   system:
+    groups:
+      basics:
+        title: Basics
+        description: Theme, language, and color.
+      device:
+        title: This device
+        description: Controls that this device provides.
+      advanced:
+        title: Advanced
+        description: Development and experimental options.
     experimental:
       refresh: Refresh policies
       title: Experimental Features
@@ -2569,7 +2593,7 @@ pages:
       install-permission: Allow installing unknown apps for AIRI, then tap Install again.
       native-only: Updates are only available in the Android app.
       failed: 'Update failed: {message}'
-    description: Customize your stage!
+    description: Adjust app preferences, appearance, and device controls.
     sections:
       section:
         custom-color:

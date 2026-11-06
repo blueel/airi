@@ -53,6 +53,7 @@ meta:
   descriptionKey: settings.pages.data.description
   icon: i-solar:database-bold-duotone
   settingsEntry: true
+  settingsGroup: app
   order: 7
   stageTransition:
     name: slide

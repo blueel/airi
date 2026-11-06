@@ -14,7 +14,8 @@ meta:
   descriptionKey: settings.pages.connection.description
   icon: i-solar:wi-fi-router-bold-duotone
   settingsEntry: true
-  order: 8
+  settingsGroup: app
+  order: 6
   stageTransition:
     name: slide
 </route>

@@ -232,6 +232,7 @@ meta:
   descriptionKey: settings.pages.scene.description
   icon: i-solar:armchair-2-bold-duotone
   settingsEntry: true
+  settingsGroup: character
   order: 3
   stageTransition:
     name: slide

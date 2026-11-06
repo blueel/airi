@@ -34,6 +34,10 @@ export interface Module {
   category: string
 }
 
+// These settings pages still show a placeholder. A listed module that cannot be configured misleads the owner.
+// Remove an id when its settings page works.
+const HIDDEN_MODULE_IDS = new Set(['home-assistant', 'mcp-server'])
+
 export function useModulesList() {
   const { t } = useI18n()
 
@@ -120,15 +124,6 @@ export function useModulesList() {
       icon: 'i-solar:palette-bold-duotone',
       to: '/settings/modules/artistry',
       configured: artistryStore.configured,
-      category: 'essential',
-    },
-    {
-      id: 'memory-short-term',
-      name: t('settings.pages.modules.memory-short-term.title'),
-      description: t('settings.pages.modules.memory-short-term.description'),
-      icon: 'i-solar:bookmark-bold-duotone',
-      to: '/settings/modules/memory-short-term',
-      configured: false,
       category: 'essential',
     },
     {
@@ -223,7 +218,7 @@ export function useModulesList() {
           category: 'essential',
         }]
       : []),
-  ])
+  ].filter(module => !HIDDEN_MODULE_IDS.has(module.id)))
 
   const categorizedModules = computed(() => {
     return modulesList.value.reduce((categories, module) => {

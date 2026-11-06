@@ -427,7 +427,8 @@ meta:
   descriptionKey: settings.pages.models.description
   icon: i-solar:people-nearby-bold-duotone
   settingsEntry: true
-  order: 4
+  settingsGroup: character
+  order: 2
   stageTransition:
     name: slide
     pageSpecificAvailable: true

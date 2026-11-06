@@ -413,6 +413,7 @@ meta:
   descriptionKey: settings.pages.card.description
   icon: i-solar:emoji-funny-square-bold-duotone
   settingsEntry: true
+  settingsGroup: character
   order: 1
   stageTransition:
     name: slide

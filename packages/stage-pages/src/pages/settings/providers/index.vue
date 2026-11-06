@@ -329,7 +329,8 @@ meta:
   descriptionKey: settings.pages.providers.description
   icon: i-solar:box-minimalistic-bold-duotone
   settingsEntry: true
-  order: 6
+  settingsGroup: ai
+  order: 5
   stageTransition:
     name: slide
     pageSpecificAvailable: true
