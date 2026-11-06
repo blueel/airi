@@ -1250,6 +1250,17 @@ pages:
         cooldown-description: The shortest time between two messages that the character starts.
         max-per-hour: Messages per hour
         max-per-hour-description: The character never starts more than this many topics in one hour.
+        notify-when-hidden:
+          label: Notify me in the background
+          description: When the app is hidden, the character sends her message as a system notification.
+        notification:
+          granted: Notifications are allowed.
+          prompt: Notifications are not allowed yet.
+          denied: Notifications are blocked. Allow them in system settings.
+          unsupported: This device cannot show notifications.
+          allow: Allow notifications
+          open-settings: Open system settings
+          channel-blocked: The system lowered the message channel. Allow notifications in system settings.
     memory-short-term:
       description: Short-term memory specific settings and management
       title: Short-Term Memory

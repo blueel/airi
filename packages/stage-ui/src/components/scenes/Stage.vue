@@ -397,7 +397,8 @@ watch(
 )
 
 // A proactive message needs the Stage, since that is where the character speaks and the owner can see it.
-onMounted(() => proactiveChat.start())
+// A hidden page can still start a topic when background notifications are on, and the reply carries the character name.
+onMounted(() => proactiveChat.start({ title: () => activeCard.value?.name ?? 'AIRI' }))
 onUnmounted(() => proactiveChat.stop())
 
 const avatarTouch = useAvatarTouchStore()

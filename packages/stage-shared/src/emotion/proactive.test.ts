@@ -12,6 +12,7 @@ function input(overrides: Partial<ProactiveGateInput> = {}): ProactiveGateInput 
     now,
     enabled: true,
     visible: true,
+    backgroundAllowed: false,
     busy: false,
     idleSince: now - 6 * 60_000,
     sentInLastHour: 0,
@@ -36,6 +37,10 @@ describe('proactive gate', () => {
   it('waits while the page is hidden or a reply is running', () => {
     expect(checkProactiveGate(input({ visible: false })).reason).toBe('hidden')
     expect(checkProactiveGate(input({ busy: true })).reason).toBe('busy')
+  })
+
+  it('allows a hidden page when the owner wants background notifications', () => {
+    expect(checkProactiveGate(input({ visible: false, backgroundAllowed: true })).reason).toBe('ready')
   })
 
   it('keeps quiet when the character has no energy', () => {

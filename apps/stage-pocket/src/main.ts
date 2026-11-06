@@ -21,6 +21,7 @@ import { browserAuthorizationHandler, registerAuthorizationHandler } from '@proj
 import { setupSynced } from '@proj-airi/stage-ui/libs/pinia'
 import { configureAnalyticsAdapter } from '@proj-airi/stage-ui/libs/product-signals'
 import { settingsSearch } from '@proj-airi/stage-ui/libs/settings-search'
+import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
 import { MotionPlugin } from '@vueuse/motion'
 import { createPinia } from 'pinia'
 import { setupLayouts } from 'virtual:generated-layouts'
@@ -30,6 +31,7 @@ import { routes } from 'vue-router/auto-routes'
 
 import App from './App.vue'
 
+import { installCharacterNotificationDelivery } from './modules/character-notifications'
 import { installDeepLinks } from './modules/deep-links'
 import { i18n } from './modules/i18n'
 import { WebAuthentication } from './modules/web-authentication'
@@ -109,6 +111,15 @@ window.addEventListener('unhandledrejection', (event) => {
 })
 
 installDeepLinks(router)
+
+installCharacterNotificationDelivery({
+  openSession: (sessionId) => {
+    void router.push('/')
+    void useChatSessionStore(pinia)
+      .setActiveSession(sessionId)
+      .catch(error => console.warn('[notifications] Could not open the session:', errorMessageFrom(error)))
+  },
+})
 
 createApp(App)
   .use(synced.vue)

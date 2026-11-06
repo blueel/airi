@@ -28,6 +28,11 @@ export interface ProactiveGateInput {
   enabled: boolean
   /** The page must be visible. A hidden tab has nobody to talk to. */
   visible: boolean
+  /**
+   * The owner allowed a message while the page is hidden, and a system notification carries it.
+   * Without it, a hidden page waits until it is visible again.
+   */
+  backgroundAllowed: boolean
   /** A running reply or speech keeps the floor. */
   busy: boolean
   /** When the owner last wrote, or when the session started. Undefined means that nothing is known. */
@@ -61,7 +66,7 @@ export function checkProactiveGate(input: ProactiveGateInput): ProactiveGateResu
 
   if (!input.enabled)
     return denied('disabled')
-  if (!input.visible)
+  if (!input.visible && !input.backgroundAllowed)
     return denied('hidden')
   if (input.busy)
     return denied('busy')

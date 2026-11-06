@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import type { CharacterNotificationStatus } from '@proj-airi/stage-ui/libs/notifications'
+
+import { getCharacterNotificationDelivery, getCharacterNotificationStatus, requestCharacterNotificationPermission } from '@proj-airi/stage-ui/libs/notifications'
 import { useEmotionStateStore } from '@proj-airi/stage-ui/stores/modules/emotion-state'
 import { useProactiveChatStore } from '@proj-airi/stage-ui/stores/modules/proactive-chat'
-import { FieldCheckbox, FieldInput } from '@proj-airi/ui'
+import { Button, FieldCheckbox, FieldInput } from '@proj-airi/ui'
+import { useEventListener } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed } from 'vue'
+import { computed, onMounted, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -11,7 +15,12 @@ const KEY = 'settings.pages.modules.emotion'
 
 const emotion = useEmotionStateStore()
 const proactive = useProactiveChatStore()
-const { enabled, silenceMs, cooldownMs, maxPerHour } = storeToRefs(proactive)
+const { enabled, silenceMs, cooldownMs, maxPerHour, notifyWhenHidden } = storeToRefs(proactive)
+
+const notificationStatus = shallowRef<CharacterNotificationStatus>({ permission: 'prompt' })
+const notificationStatusLoaded = shallowRef(false)
+const requestingNotificationPermission = shallowRef(false)
+const canOpenNotificationSettings = Boolean(getCharacterNotificationDelivery().openSettings)
 
 const silenceMinutes = computed<number>({
   get: () => Math.round(silenceMs.value / 60_000),
@@ -24,6 +33,36 @@ const cooldownMinutes = computed<number>({
 const messagesPerHour = computed<number>({
   get: () => Math.round(maxPerHour.value),
   set: value => maxPerHour.value = Math.min(12, Math.max(1, Math.round(Number(value) || 3))),
+})
+
+async function refreshNotificationStatus() {
+  notificationStatus.value = await getCharacterNotificationStatus()
+  notificationStatusLoaded.value = true
+}
+
+async function allowNotifications() {
+  requestingNotificationPermission.value = true
+  try {
+    await requestCharacterNotificationPermission()
+    await refreshNotificationStatus()
+  }
+  finally {
+    requestingNotificationPermission.value = false
+  }
+}
+
+function openNotificationSettings() {
+  void getCharacterNotificationDelivery().openSettings?.()
+}
+
+onMounted(() => {
+  void refreshNotificationStatus()
+})
+
+// The owner can change the permission in system settings while this page is in the background.
+useEventListener(document, 'visibilitychange', () => {
+  if (document.visibilityState === 'visible')
+    void refreshNotificationStatus()
 })
 </script>
 
@@ -74,6 +113,22 @@ const messagesPerHour = computed<number>({
         <FieldInput v-model="silenceMinutes" type="number" :label="t(`${KEY}.proactive.silence`)" :description="t(`${KEY}.proactive.silence-description`)" />
         <FieldInput v-model="cooldownMinutes" type="number" :label="t(`${KEY}.proactive.cooldown`)" :description="t(`${KEY}.proactive.cooldown-description`)" />
         <FieldInput v-model="messagesPerHour" type="number" :label="t(`${KEY}.proactive.max-per-hour`)" :description="t(`${KEY}.proactive.max-per-hour-description`)" />
+      </div>
+
+      <div v-if="enabled" :class="['flex', 'flex-col', 'gap-3', 'border-t', 'border-neutral-200', 'pt-4', 'dark:border-neutral-800']">
+        <FieldCheckbox v-model="notifyWhenHidden" :label="t(`${KEY}.proactive.notify-when-hidden.label`)" :description="t(`${KEY}.proactive.notify-when-hidden.description`)" />
+        <div v-if="notifyWhenHidden && notificationStatusLoaded" :class="['flex', 'flex-wrap', 'items-center', 'gap-2', 'text-sm', 'text-neutral-500 dark:text-neutral-400']">
+          <span>{{ t(`${KEY}.proactive.notification.${notificationStatus.permission}`) }}</span>
+          <Button v-if="notificationStatus.permission !== 'granted' && notificationStatus.permission !== 'unsupported'" size="sm" :loading="requestingNotificationPermission" @click="allowNotifications">
+            {{ t(`${KEY}.proactive.notification.allow`) }}
+          </Button>
+          <Button v-if="canOpenNotificationSettings && (notificationStatus.permission === 'denied' || notificationStatus.channelBlocked)" size="sm" @click="openNotificationSettings">
+            {{ t(`${KEY}.proactive.notification.open-settings`) }}
+          </Button>
+        </div>
+        <p v-if="notifyWhenHidden && notificationStatus.channelBlocked" :class="['text-sm', 'text-amber-600', 'dark:text-amber-400']">
+          {{ t(`${KEY}.proactive.notification.channel-blocked`) }}
+        </p>
       </div>
     </div>
   </div>

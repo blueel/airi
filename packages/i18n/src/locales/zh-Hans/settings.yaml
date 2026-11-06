@@ -1187,6 +1187,17 @@ pages:
         cooldown-description: 角色两次主动消息之间的最短间隔。
         max-per-hour: 每小时消息数
         max-per-hour-description: 角色一小时内主动开启话题的次数上限。
+        notify-when-hidden:
+          label: 后台时通知我
+          description: 应用退到后台时，角色主动发的消息会以系统通知显示。
+        notification:
+          granted: 通知权限已开启。
+          prompt: 还没有开启通知权限。
+          denied: 通知已被系统阻止，请在系统设置里允许。
+          unsupported: 这个设备无法显示通知。
+          allow: 允许通知
+          open-settings: 打开系统设置
+          channel-blocked: 系统降低了消息通知频道，请在系统设置里允许通知。
     memory-short-term:
       description: 短期记忆
       title: 短期记忆
