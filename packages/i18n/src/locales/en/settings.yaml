@@ -2571,6 +2571,7 @@ pages:
         running: Running
         stopped: Off
         overlay: Display over other apps
+        microphone: Microphone
         granted: Allowed
         denied: Not allowed
       enable:
@@ -2580,18 +2581,21 @@ pages:
         label: Turn off the screen bubble
       notice:
         title: Before you start
-        body: Android asks for permission to display over other apps, then for screen capture. Both permissions stay in the system settings of this phone.
-        background: The bubble keeps AIRI running in the background. Tap it in any app. AIRI captures the screen, sends it to the active conversation, and speaks the reply.
+        body: Android asks for permission to display over other apps, then for screen capture. Hold-to-talk also needs the microphone. All permissions stay in the system settings of this phone.
+        background: The bubble keeps AIRI running in the background. Tap it in any app to send a screenshot, or hold it to speak. AIRI answers and speaks the reply.
         voice: AIRI speaks the reply. Set up a speech provider to hear it.
         vision: The selected chat model cannot read images and no vision provider is set. Set one up, or the screenshot cannot be described.
+        microphone-denied: Microphone access is off, so hold-to-talk cannot record. Grant it to use voice.
         notifications-denied: Notifications are off, so the running bubble has no visible notification. You can still stop it from the system notification settings.
       actions:
         open-vision: Open vision settings
         open-speech: Open speech settings
+        grant-microphone: Allow microphone
       errors:
         status: Could not read the bubble status.
         start: Could not turn on the screen bubble.
         stop: Could not turn off the screen bubble.
+        microphone: Could not request the microphone permission.
         not-running: The bubble did not start. Check the permissions and try again.
       native-only: The screen bubble is only available in the Android app.
     mika:

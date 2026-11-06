@@ -1,8 +1,10 @@
 package ai.moeru.airi_pocket
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionConfig
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
@@ -24,15 +26,15 @@ import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
 
 /**
- * Opens the permissions of the floating bubble and carries its captures to the WebView.
+ * Opens the permissions of the floating bubble and carries its captures and voice transcripts to the WebView.
  *
  * Use when:
  * - The settings page turns the bubble on or off.
- * - The bubble service has a screenshot for the active chat turn.
+ * - The bubble service has a screenshot or a transcript for the active chat turn.
  *
  * Expects:
- * - The owner grants "display over other apps" and the screen capture consent once per app run.
- * - The WebView registers its listener before a tap, which `ready` reports.
+ * - The owner grants "display over other apps", the screen capture consent once per app run, and microphone access.
+ * - The WebView registers its listeners before a tap or a hold, which `ready` reports.
  *
  * The service holds the projection, so a tap never opens another consent dialog.
  */
@@ -50,6 +52,8 @@ class FloatingBubblePlugin : Plugin() {
         private val pendingLock = Any()
         private var pendingCapture: String? = null
         private var pendingSince = 0L
+        private var pendingTranscript: String? = null
+        private var pendingTranscriptSince = 0L
 
         /**
          * Keeps a capture until the WebView asks for it. The caller also opens the app when no activity exists,
@@ -60,9 +64,21 @@ class FloatingBubblePlugin : Plugin() {
                 pendingCapture = dataUrl
                 pendingSince = SystemClock.elapsedRealtime()
             }
-            if (!openActivity)
-                return
+            if (openActivity)
+                openAppForPending(context)
+        }
 
+        /** Keeps a transcript until the WebView asks for it, for the same reason as a capture. */
+        fun holdTranscript(context: Context, text: String, openActivity: Boolean) {
+            synchronized(pendingLock) {
+                pendingTranscript = text
+                pendingTranscriptSince = SystemClock.elapsedRealtime()
+            }
+            if (openActivity)
+                openAppForPending(context)
+        }
+
+        private fun openAppForPending(context: Context) {
             val intent = Intent(context, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
@@ -70,7 +86,7 @@ class FloatingBubblePlugin : Plugin() {
                 context.startActivity(intent)
             }
             catch (error: Exception) {
-                Log.w(TAG, "Could not open the app for a pending capture", error)
+                Log.w(TAG, "Could not open the app for a pending bubble message", error)
             }
         }
 
@@ -83,9 +99,19 @@ class FloatingBubblePlugin : Plugin() {
                 return dataUrl
             }
         }
+
+        private fun takePendingTranscript(): String? {
+            synchronized(pendingLock) {
+                val fresh = SystemClock.elapsedRealtime() - pendingTranscriptSince <= PENDING_CAPTURE_TTL_MS
+                val text = if (fresh) pendingTranscript else null
+                pendingTranscript = null
+                pendingTranscriptSince = 0L
+                return text
+            }
+        }
     }
 
-    /** Whether the WebView installed its capture listener. */
+    /** Whether the WebView installed its capture and transcript listeners. */
     @Volatile
     private var listenerReady = false
 
@@ -108,11 +134,15 @@ class FloatingBubblePlugin : Plugin() {
             put("overlayPermission", Settings.canDrawOverlays(context))
             put("running", FloatingBubbleService.isRunning)
             put("projection", FloatingBubbleService.hasProjection)
+            put(
+                "microphonePermission",
+                context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
+            )
         }
         call.resolve(result)
     }
 
-    /** Marks the WebView ready, after it added its capture listener. */
+    /** Marks the WebView ready, after it added its capture and transcript listeners. */
     @PluginMethod
     fun ready(call: PluginCall) {
         listenerReady = true
@@ -146,6 +176,8 @@ class FloatingBubblePlugin : Plugin() {
         synchronized(pendingLock) {
             pendingCapture = null
             pendingSince = 0L
+            pendingTranscript = null
+            pendingTranscriptSince = 0L
         }
         call.resolve()
     }
@@ -170,6 +202,14 @@ class FloatingBubblePlugin : Plugin() {
         call.resolve(result)
     }
 
+    /** Returns one transcript that arrived before the WebView could take it. */
+    @PluginMethod
+    fun consumePendingTranscript(call: PluginCall) {
+        val result = JSObject()
+        takePendingTranscript()?.let { text -> result.put("text", text) }
+        call.resolve(result)
+    }
+
     /** Sends one capture to the active turn. A missing listener keeps it for `consumePendingCapture`. */
     fun deliverCapture(dataUrl: String) {
         val currentActivity = activity
@@ -184,6 +224,23 @@ class FloatingBubblePlugin : Plugin() {
                 return@post
             }
             notifyListeners("capture", JSObject().put("dataUrl", dataUrl))
+        }
+    }
+
+    /** Sends one transcript to the active turn. A missing listener keeps it for `consumePendingTranscript`. */
+    fun deliverTranscript(text: String) {
+        val currentActivity = activity
+        if (currentActivity == null || !listenerReady) {
+            holdTranscript(context, text, openActivity = currentActivity == null)
+            return
+        }
+
+        Handler(Looper.getMainLooper()).post {
+            if (!listenerReady) {
+                holdTranscript(context, text, openActivity = activity == null)
+                return@post
+            }
+            notifyListeners("transcript", JSObject().put("text", text))
         }
     }
 

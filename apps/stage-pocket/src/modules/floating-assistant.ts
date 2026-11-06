@@ -8,6 +8,12 @@ export interface FloatingAssistantStatus {
   overlayPermission: boolean
   running: boolean
   projection: boolean
+  microphonePermission: boolean
+}
+
+interface FloatingAssistantListener {
+  (eventName: 'capture', listener: (capture: { dataUrl: string }) => void): Promise<PluginListenerHandle>
+  (eventName: 'transcript', listener: (transcript: { text: string }) => void): Promise<PluginListenerHandle>
 }
 
 interface FloatingAssistantPlugin {
@@ -16,11 +22,9 @@ interface FloatingAssistantPlugin {
   stop: () => Promise<void>
   ready: () => Promise<void>
   consumePendingCapture: () => Promise<{ dataUrl?: string }>
+  consumePendingTranscript: () => Promise<{ text?: string }>
   toast: (options: { text: string }) => Promise<void>
-  addListener: (
-    eventName: 'capture',
-    listener: (capture: { dataUrl: string }) => void,
-  ) => Promise<PluginListenerHandle>
+  addListener: FloatingAssistantListener
 }
 
 export const FloatingAssistant = registerPlugin<FloatingAssistantPlugin>('FloatingBubble')

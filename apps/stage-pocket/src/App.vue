@@ -31,7 +31,7 @@ import { toast, Toaster } from 'vue-sonner'
 
 import OnboardingPermissionsStep from './components/onboarding/step-permissions.vue'
 
-import { installFloatingAssistantCapture } from './modules/floating-assistant-capture'
+import { installFloatingAssistantTurns } from './modules/floating-assistant-turns'
 import { getHostWebSocketConnector } from './modules/websocket-bridge'
 
 const contextBridgeStore = useContextBridgeStore()
@@ -138,7 +138,7 @@ async function loadStartup() {
 }
 
 onMounted(() => {
-  installFloatingAssistantCapture({ audioContext: audioContextStore, chat: chatStore, chatSession: chatSessionStore })
+  installFloatingAssistantTurns({ audioContext: audioContextStore, chat: chatStore, chatSession: chatSessionStore })
   void startup.run('route', () => router.isReady()).catch(error => console.error('Initial route failed:', error))
   void loadStartup()
 })

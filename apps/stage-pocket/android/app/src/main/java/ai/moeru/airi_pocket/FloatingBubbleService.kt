@@ -1,5 +1,6 @@
 package ai.moeru.airi_pocket
 
+import android.Manifest
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ObjectAnimator
@@ -10,6 +11,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -24,11 +26,15 @@ import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.util.Base64
 import android.util.DisplayMetrics
 import android.util.Log
@@ -43,11 +49,13 @@ import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import java.io.ByteArrayOutputStream
+import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -88,6 +96,11 @@ class FloatingBubbleService : Service() {
         private const val BUBBLE_FADE_DURATION_MS = 140L
         private const val BUBBLE_TAP_FLASH_DURATION_MS = 200L
         private const val BUBBLE_TAP_HIDE_DELAY_MS = 120L
+        private const val BUBBLE_LONG_PRESS_MS = 450L
+        private const val VOICE_MAX_DURATION_MS = 30_000L
+        private const val VOICE_PULSE_DURATION_MS = 650L
+        private const val VOICE_ALPHA_MIN = 0.16f
+        private const val VOICE_ALPHA_MAX = 0.42f
         private const val BUBBLE_ALPHA_NORMAL = 0.96f
         private const val BUBBLE_ALPHA_SNAPPED = 0.6f
         private const val EDGE_NONE = 0
@@ -110,9 +123,18 @@ class FloatingBubbleService : Service() {
     private var bubbleView: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var bubbleFlashView: View? = null
+    private var bubbleTouchListener: BubbleDragListener? = null
     private var snapAnimator: ValueAnimator? = null
     private var alphaAnimator: ObjectAnimator? = null
+    private var listeningAnimator: ObjectAnimator? = null
     private var snappedEdge = EDGE_NONE
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var voiceTimeout: Runnable? = null
+    private var voiceGestureActive = false
+    private var voiceHolding = false
+    private var voiceListening = false
+    private var voiceCancelled = false
+    private var voiceResult: String? = null
     private var mediaProjection: MediaProjection? = null
     private var projectionCallback: MediaProjection.Callback? = null
     private var virtualDisplay: VirtualDisplay? = null
@@ -159,6 +181,21 @@ class FloatingBubbleService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        voiceGestureActive = false
+        voiceHolding = false
+        voiceResult = null
+        voiceListening = false
+        clearVoiceTimeout()
+        stopListeningFeedback()
+        voiceCancelled = true
+        try {
+            speechRecognizer?.cancel()
+        }
+        catch (error: Exception) {
+            Log.w(TAG, "Could not cancel speech recognition", error)
+        }
+        speechRecognizer?.destroy()
+        speechRecognizer = null
         snapAnimator?.cancel()
         snapAnimator = null
         alphaAnimator?.cancel()
@@ -413,7 +450,9 @@ class FloatingBubbleService : Service() {
         }
 
         val bubble = createBubbleView(size)
-        bubble.setOnTouchListener(BubbleDragListener(params))
+        val listener = BubbleDragListener(params)
+        bubbleTouchListener = listener
+        bubble.setOnTouchListener(listener)
 
         try {
             manager.addView(bubble, params)
@@ -421,6 +460,7 @@ class FloatingBubbleService : Service() {
         catch (error: Exception) {
             Log.e(TAG, "Could not add the floating bubble", error)
             bubbleFlashView = null
+            bubbleTouchListener = null
             stopSelf()
             return
         }
@@ -434,6 +474,8 @@ class FloatingBubbleService : Service() {
 
     private fun removeBubble() {
         val bubble = bubbleView ?: return
+        bubbleTouchListener?.cancelLongPress(bubble)
+        bubbleTouchListener = null
         snapAnimator?.cancel()
         snapAnimator = null
         alphaAnimator?.cancel()
@@ -597,6 +639,224 @@ class FloatingBubbleService : Service() {
         }
     }
 
+    /** Starts hold-to-talk after the owner held the bubble. */
+    private fun beginVoiceGesture(view: View) {
+        if (voiceGestureActive)
+            return
+
+        voiceGestureActive = true
+        voiceHolding = true
+        voiceResult = null
+        voiceCancelled = false
+        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        fadeBubble(view, BUBBLE_ALPHA_NORMAL)
+
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            notify(R.string.floating_bubble_microphone_denied)
+            return
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            notify(R.string.floating_bubble_voice_unavailable)
+            return
+        }
+
+        val recognizer = ensureSpeechRecognizer() ?: return
+        startListeningFeedback()
+        voiceListening = true
+        try {
+            recognizer.startListening(speechRecognizerIntent())
+            scheduleVoiceTimeout()
+        }
+        catch (error: Exception) {
+            Log.e(TAG, "Could not start speech recognition", error)
+            voiceListening = false
+            stopListeningFeedback()
+            notify(R.string.floating_bubble_voice_failed)
+        }
+    }
+
+    /** Stops hold-to-talk on release and sends the transcript when the recognizer has it. */
+    private fun endVoiceGesture(view: View, params: WindowManager.LayoutParams) {
+        voiceHolding = false
+        voiceGestureActive = false
+
+        if (voiceListening) {
+            voiceListening = false
+            clearVoiceTimeout()
+            stopListeningFeedback()
+            try {
+                speechRecognizer?.stopListening()
+            }
+            catch (error: Exception) {
+                Log.w(TAG, "Could not stop speech recognition", error)
+            }
+        }
+        else {
+            val result = voiceResult
+            voiceResult = null
+            if (!result.isNullOrEmpty())
+                deliverVoice(result)
+        }
+
+        settleBubble(view, params, animate = false)
+    }
+
+    private fun cancelVoiceGesture() {
+        voiceGestureActive = false
+        voiceHolding = false
+        voiceResult = null
+        voiceListening = false
+        clearVoiceTimeout()
+        stopListeningFeedback()
+        if (speechRecognizer != null) {
+            voiceCancelled = true
+            speechRecognizer?.cancel()
+        }
+    }
+
+    private fun ensureSpeechRecognizer(): SpeechRecognizer? {
+        speechRecognizer?.let { return it }
+        return try {
+            SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
+                recognizer.setRecognitionListener(voiceListener)
+                speechRecognizer = recognizer
+            }
+        }
+        catch (error: Exception) {
+            Log.e(TAG, "Could not create the speech recognizer", error)
+            notify(R.string.floating_bubble_voice_failed)
+            null
+        }
+    }
+
+    private val voiceListener = object : RecognitionListener {
+        override fun onReadyForSpeech(params: Bundle?) {}
+        override fun onBeginningOfSpeech() {}
+        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onBufferReceived(buffer: ByteArray?) {}
+        override fun onEndOfSpeech() {}
+        override fun onError(error: Int) = handleVoiceError(error)
+        override fun onResults(results: Bundle?) = handleVoiceResults(results)
+        override fun onPartialResults(partialResults: Bundle?) {}
+        override fun onEvent(eventType: Int, params: Bundle?) {}
+    }
+
+    private fun handleVoiceResults(results: Bundle?) {
+        voiceListening = false
+        clearVoiceTimeout()
+        stopListeningFeedback()
+
+        val text = results
+            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            ?.firstOrNull()
+            ?.trim()
+            .orEmpty()
+
+        if (text.isEmpty()) {
+            notify(R.string.floating_bubble_voice_empty)
+            voiceResult = null
+            return
+        }
+
+        // The recognizer can end on silence while the owner still holds the bubble.
+        if (voiceHolding) {
+            voiceResult = text
+            return
+        }
+
+        deliverVoice(text)
+    }
+
+    private fun handleVoiceError(error: Int) {
+        voiceListening = false
+        clearVoiceTimeout()
+        stopListeningFeedback()
+        voiceResult = null
+
+        if (error == SpeechRecognizer.ERROR_CLIENT)
+            return
+
+        Log.w(TAG, "Speech recognition failed with error $error")
+        val message = when (error) {
+            SpeechRecognizer.ERROR_NO_MATCH,
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> R.string.floating_bubble_voice_empty
+
+            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> R.string.floating_bubble_microphone_denied
+            else -> R.string.floating_bubble_voice_failed
+        }
+        notify(message)
+    }
+
+    private fun speechRecognizerIntent(): Intent {
+        return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+        }
+    }
+
+    private fun scheduleVoiceTimeout() {
+        clearVoiceTimeout()
+        val timeout = Runnable {
+            voiceTimeout = null
+            if (!voiceListening)
+                return@Runnable
+
+            voiceListening = false
+            stopListeningFeedback()
+            try {
+                speechRecognizer?.stopListening()
+            }
+            catch (error: Exception) {
+                Log.w(TAG, "Could not stop the long voice input", error)
+            }
+        }
+        voiceTimeout = timeout
+        mainHandler.postDelayed(timeout, VOICE_MAX_DURATION_MS)
+    }
+
+    private fun clearVoiceTimeout() {
+        voiceTimeout?.let { mainHandler.removeCallbacks(it) }
+        voiceTimeout = null
+    }
+
+    private fun startListeningFeedback() {
+        val flash = bubbleFlashView ?: return
+        listeningAnimator?.cancel()
+        flash.animate().cancel()
+        flash.alpha = VOICE_ALPHA_MIN
+        listeningAnimator = ObjectAnimator.ofFloat(flash, View.ALPHA, VOICE_ALPHA_MIN, VOICE_ALPHA_MAX).apply {
+            duration = VOICE_PULSE_DURATION_MS
+            repeatMode = ValueAnimator.REVERSE
+            repeatCount = ValueAnimator.INFINITE
+            start()
+        }
+    }
+
+    private fun stopListeningFeedback() {
+        listeningAnimator?.cancel()
+        listeningAnimator = null
+        bubbleFlashView?.let { flash ->
+            flash.animate().cancel()
+            flash.animate().alpha(0f).setDuration(120).start()
+        }
+    }
+
+    private fun deliverVoice(text: String) {
+        val plugin = FloatingBubblePlugin.instance
+        if (plugin == null) {
+            FloatingBubblePlugin.holdTranscript(this, text, openActivity = true)
+            return
+        }
+        plugin.deliverTranscript(text)
+    }
+
+    private fun notify(message: Int) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
     private inner class BubbleDragListener(
         private val params: WindowManager.LayoutParams,
     ) : View.OnTouchListener {
@@ -606,6 +866,12 @@ class FloatingBubbleService : Service() {
         private var downRawX = 0f
         private var downRawY = 0f
         private var dragging = false
+        private var longPressAction: Runnable? = null
+
+        fun cancelLongPress(view: View) {
+            longPressAction?.let { view.removeCallbacks(it) }
+            longPressAction = null
+        }
 
         override fun onTouch(view: View, event: MotionEvent): Boolean {
             when (event.actionMasked) {
@@ -615,18 +881,30 @@ class FloatingBubbleService : Service() {
                     startX = params.x
                     startY = params.y
                     dragging = false
+                    cancelLongPress(view)
                     snapAnimator?.cancel()
                     snapAnimator = null
                     // The snapped bubble is translucent, so it becomes opaque while the owner holds it.
                     fadeBubble(view, BUBBLE_ALPHA_NORMAL)
                     view.animate().scaleX(0.92f).scaleY(0.92f).setDuration(80).start()
+
+                    longPressAction = Runnable {
+                        longPressAction = null
+                        if (!dragging)
+                            beginVoiceGesture(view)
+                    }.also { action -> view.postDelayed(action, BUBBLE_LONG_PRESS_MS) }
                 }
 
                 MotionEvent.ACTION_MOVE -> {
+                    if (voiceGestureActive)
+                        return true
+
                     val deltaX = event.rawX - downRawX
                     val deltaY = event.rawY - downRawY
-                    if (!dragging && (abs(deltaX) > touchSlop || abs(deltaY) > touchSlop))
+                    if (!dragging && (abs(deltaX) > touchSlop || abs(deltaY) > touchSlop)) {
                         dragging = true
+                        cancelLongPress(view)
+                    }
                     if (!dragging)
                         return true
 
@@ -637,16 +915,26 @@ class FloatingBubbleService : Service() {
                 }
 
                 MotionEvent.ACTION_UP -> {
+                    cancelLongPress(view)
                     view.animate().scaleX(1f).scaleY(1f).setDuration(80).start()
-                    if (!dragging)
-                        playTapFeedback(view)
-                    settleBubble(view, params, animate = dragging)
-                    if (!dragging)
-                        requestCapture()
+                    when {
+                        voiceGestureActive -> endVoiceGesture(view, params)
+
+                        !dragging -> {
+                            playTapFeedback(view)
+                            settleBubble(view, params, animate = false)
+                            requestCapture()
+                        }
+
+                        else -> settleBubble(view, params, animate = true)
+                    }
                 }
 
                 MotionEvent.ACTION_CANCEL -> {
+                    cancelLongPress(view)
                     view.animate().scaleX(1f).scaleY(1f).setDuration(80).start()
+                    if (voiceGestureActive)
+                        cancelVoiceGesture()
                     settleBubble(view, params, animate = false)
                 }
             }

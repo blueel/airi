@@ -452,6 +452,7 @@ status:
 floating-assistant:
   prompt: This is a screenshot of my phone screen. Look at it and tell me briefly what you see and what I am doing. Answer in my language.
   failed: AIRI could not read the screen.
+  voice-failed: AIRI could not send the voice message.
 
 model-assets:
   retry: Retry

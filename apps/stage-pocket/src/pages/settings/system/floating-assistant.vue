@@ -12,6 +12,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { FloatingAssistant, isFloatingAssistantSupported } from '../../../modules/floating-assistant'
+import { MicrophonePermission } from '../../../modules/microphone-permission'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -27,6 +28,8 @@ const notificationsDenied = ref(false)
 
 const running = computed(() => status.value?.running === true)
 const overlayPermission = computed(() => status.value?.overlayPermission === true)
+const microphonePermission = computed(() => status.value?.microphonePermission === true)
+const microphoneMissing = computed(() => status.value != null && !microphonePermission.value)
 
 /** The chat model reads the image itself, or a vision provider reads it before the chat model replies. */
 const imagesHaveReader = computed(() => {
@@ -64,6 +67,9 @@ async function enable() {
       notificationsDenied.value = notification.display !== 'granted'
     }
 
+    // Hold-to-talk records with the native speech recognizer, so the bubble needs the microphone once.
+    await MicrophonePermission.requestPermission()
+
     await FloatingAssistant.start()
     // The service creates its bubble on the main thread. Give it a moment before the page reports a failure.
     for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -98,6 +104,16 @@ async function disable() {
   }
   finally {
     busy.value = false
+  }
+}
+
+async function grantMicrophone() {
+  try {
+    await MicrophonePermission.requestPermission()
+    await refresh()
+  }
+  catch (cause) {
+    error.value = errorMessageFrom(cause) ?? t('settings.pages.system.floating-assistant.errors.microphone')
   }
 }
 
@@ -149,6 +165,15 @@ onUnmounted(() => {
         </span>
       </div>
 
+      <div :class="['flex items-center justify-between gap-3']">
+        <span :class="['text-sm font-medium']">
+          {{ t('settings.pages.system.floating-assistant.status.microphone') }}
+        </span>
+        <span :class="microphonePermission ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'">
+          {{ microphonePermission ? t('settings.pages.system.floating-assistant.status.granted') : t('settings.pages.system.floating-assistant.status.denied') }}
+        </span>
+      </div>
+
       <Button
         v-if="!running"
         color="primary"
@@ -189,6 +214,16 @@ onUnmounted(() => {
       <p :class="['text-sm text-amber-700/90 dark:text-amber-200/80']">
         {{ t('settings.pages.system.floating-assistant.notice.background') }}
       </p>
+      <p v-if="microphoneMissing" :class="['text-sm text-amber-700/90 dark:text-amber-200/80']">
+        {{ t('settings.pages.system.floating-assistant.notice.microphone-denied') }}
+      </p>
+      <Button
+        v-if="microphoneMissing"
+        color="amber"
+        variant="secondary"
+        :label="t('settings.pages.system.floating-assistant.actions.grant-microphone')"
+        @click="grantMicrophone"
+      />
       <p v-if="!speech.configured" :class="['text-sm text-amber-700/90 dark:text-amber-200/80']">
         {{ t('settings.pages.system.floating-assistant.notice.voice') }}
       </p>

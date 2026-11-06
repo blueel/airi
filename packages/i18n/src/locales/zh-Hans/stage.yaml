@@ -448,6 +448,7 @@ status:
 floating-assistant:
   prompt: 这是我手机的屏幕截图。看看我在做什么，用简短的话告诉我。用我的语言回答。
   failed: AIRI 没能看懂这张屏幕截图。
+  voice-failed: AIRI 没能把语音发出去。
 model-assets:
   retry: 重试
   errors:

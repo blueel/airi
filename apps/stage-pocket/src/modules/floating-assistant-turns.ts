@@ -7,7 +7,7 @@ import { errorMessageFrom } from '@moeru/std'
 import { FloatingAssistant, isFloatingAssistantSupported } from './floating-assistant'
 import { i18n } from './i18n'
 
-export interface FloatingAssistantCaptureDeps {
+export interface FloatingAssistantTurnDeps {
   audioContext: ReturnType<typeof useAudioContext>
   chat: ReturnType<typeof useChatStore>
   chatSession: ReturnType<typeof useChatSessionStore>
@@ -22,23 +22,23 @@ export function attachmentFromCapture(dataUrl: string): { type: 'image', data: s
 }
 
 /**
- * Sends each bubble capture to the active conversation.
+ * Sends each bubble capture and voice transcript to the active conversation.
  *
- * The reply is a normal owner turn, so the Stage hooks speak it like a typed message. A capture that arrives while the
+ * The reply is a normal owner turn, so the Stage hooks speak it like a typed message. A message that arrives while the
  * page still loads waits for the session store, and one the WebView missed is taken from the native buffer.
  */
-export function installFloatingAssistantCapture(deps: FloatingAssistantCaptureDeps) {
+export function installFloatingAssistantTurns(deps: FloatingAssistantTurnDeps) {
   if (!isFloatingAssistantSupported())
     return
 
-  const reportFailure = (error: unknown) => {
-    console.warn('[floating-assistant] The screen capture could not be sent:', errorMessageFrom(error) ?? 'unknown error')
-    void FloatingAssistant.toast({ text: i18n.global.t('stage.floating-assistant.failed') }).catch(() => {})
+  const reportFailure = (error: unknown, messageKey: string) => {
+    console.warn('[floating-assistant] The bubble message could not be sent:', errorMessageFrom(error) ?? 'unknown error')
+    void FloatingAssistant.toast({ text: i18n.global.t(messageKey) }).catch(() => {})
   }
 
-  const sendCapture = async (dataUrl: string) => {
+  const ensureTurn = async () => {
     // Android can suspend the Web Audio context while the app is in the background. The speech player needs a
-    // running context to play the reply that this capture starts.
+    // running context to play the reply that this message starts.
     if (deps.audioContext.audioContext.state === 'suspended') {
       try {
         await deps.audioContext.audioContext.resume()
@@ -55,7 +55,11 @@ export function installFloatingAssistantCapture(deps: FloatingAssistantCaptureDe
     const sessionId = await deps.chatSession.ensureCurrentSession()
     if (!sessionId)
       throw new Error('AIRI has no active conversation.')
+    return sessionId
+  }
 
+  const sendCapture = async (dataUrl: string) => {
+    const sessionId = await ensureTurn()
     await deps.chat.send({
       sessionId,
       text: i18n.global.t('stage.floating-assistant.prompt'),
@@ -63,16 +67,33 @@ export function installFloatingAssistantCapture(deps: FloatingAssistantCaptureDe
     })
   }
 
+  const sendTranscript = async (text: string) => {
+    const transcript = text.trim()
+    if (!transcript)
+      return
+
+    const sessionId = await ensureTurn()
+    await deps.chat.send({ sessionId, text: transcript })
+  }
+
   void (async () => {
     await FloatingAssistant.addListener('capture', ({ dataUrl }) => {
       if (dataUrl)
-        void sendCapture(dataUrl).catch(reportFailure)
+        void sendCapture(dataUrl).catch(error => reportFailure(error, 'stage.floating-assistant.failed'))
     })
-    // Only now can the service hand a capture straight to this listener.
+    await FloatingAssistant.addListener('transcript', ({ text }) => {
+      if (text)
+        void sendTranscript(text).catch(error => reportFailure(error, 'stage.floating-assistant.voice-failed'))
+    })
+    // Only now can the service hand a message straight to these listeners.
     await FloatingAssistant.ready()
 
-    const pending = await FloatingAssistant.consumePendingCapture()
-    if (pending.dataUrl)
-      void sendCapture(pending.dataUrl).catch(reportFailure)
-  })().catch(reportFailure)
+    const pendingCapture = await FloatingAssistant.consumePendingCapture()
+    if (pendingCapture.dataUrl)
+      void sendCapture(pendingCapture.dataUrl).catch(error => reportFailure(error, 'stage.floating-assistant.failed'))
+
+    const pendingTranscript = await FloatingAssistant.consumePendingTranscript()
+    if (pendingTranscript.text)
+      void sendTranscript(pendingTranscript.text).catch(error => reportFailure(error, 'stage.floating-assistant.voice-failed'))
+  })().catch(error => reportFailure(error, 'stage.floating-assistant.failed'))
 }
