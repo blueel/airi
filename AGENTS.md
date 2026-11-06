@@ -167,6 +167,7 @@ Skills are in `.agents/skills/<name>/SKILL.md`. Read the listed file before you 
 | Write or change a string that users see, or a glossary term | [`packages/i18n/AGENTS.md`](packages/i18n/AGENTS.md) |
 | Review pending Crowdin translations, or find why approved translations did not reach the repository | [`enforce-rules-for-i18n`](.agents/skills/enforce-rules-for-i18n/SKILL.md) |
 | Work under `server/` | [`server/AGENTS.md`](server/AGENTS.md). For `server/apps/api`, also read [`server/apps/api/AGENTS.md`](server/apps/api/AGENTS.md). |
+| Build or publish the stage-pocket Android app | [`apps/stage-pocket/AGENTS.md`](apps/stage-pocket/AGENTS.md) |
 | Write documentation, code comments, commit messages, or PR and issue text | [`simple-english`](.agents/skills/simple-english/SKILL.md) |
 | Analyze why a chat, speech, or audio turn was slow or failed, using saved IO traces | [`analyze-io-traces`](.agents/skills/analyze-io-traces/SKILL.md) |
 | Create or prepare a pull request | [`create-pr`](.agents/skills/create-pr/SKILL.md) |
@@ -178,3 +179,4 @@ These directories also have their own `AGENTS.md`. Read it before you work in th
 
 - `packages/model-driver-mediapipe/`
 - `services/computer-use-mcp/`
+- `apps/stage-pocket/`
