@@ -2391,7 +2391,7 @@ pages:
       checking: 检查中...
       up-to-date: 已是最新版本
       available: 发现新版本 {version}
-      notes: 更新说明
+      notes: 更新内容
       download: 下载更新
       downloading: 下载中... {percent}%
       downloaded: 更新已下载（{size}）

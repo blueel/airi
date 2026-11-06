@@ -2598,7 +2598,7 @@ pages:
       checking: Checking...
       up-to-date: You are on the latest version.
       available: Version {version} is available.
-      notes: Release notes
+      notes: What's new
       download: Download update
       downloading: 'Downloading... {percent}%'
       downloaded: Update downloaded ({size}).

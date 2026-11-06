@@ -65,6 +65,16 @@ const downloadedSize = computed(() => {
   return `${(downloaded.value.bytes / 1024 / 1024).toFixed(1)} MB`
 })
 
+const noteLines = computed(() => {
+  const notes = result.value?.latest.notes?.trim()
+  if (!notes)
+    return []
+  return notes
+    .split('\n')
+    .map(line => line.replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean)
+})
+
 function messageOf(cause: unknown) {
   return errorMessageFrom(cause) ?? 'Unknown error'
 }
@@ -189,13 +199,15 @@ async function installUpdate() {
           </span>
         </div>
 
-        <div v-if="result.latest.notes" :class="['flex flex-col gap-1']">
+        <div v-if="noteLines.length" :class="['flex flex-col gap-1']">
           <span :class="['text-sm text-neutral-500 dark:text-neutral-400']">
             {{ t('settings.pages.system.update.notes') }}
           </span>
-          <p :class="['text-sm whitespace-pre-line']">
-            {{ result.latest.notes }}
-          </p>
+          <ul :class="['list-disc pl-5', 'flex flex-col gap-1 text-sm']">
+            <li v-for="(line, index) in noteLines" :key="index">
+              {{ line }}
+            </li>
+          </ul>
         </div>
 
         <div v-if="downloading" :class="['flex flex-col gap-1']">
