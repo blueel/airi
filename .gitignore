@@ -44,6 +44,8 @@ cert*/
 *.cer
 *.key
 *.p12
+# The public AIRI origin certificate is a WebView trust anchor, not a secret.
+!apps/stage-pocket/android/app/src/main/res/raw/airi_cert.pem
 
 # Test coverage
 coverage/
