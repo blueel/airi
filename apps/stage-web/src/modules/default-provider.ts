@@ -498,6 +498,42 @@ function seedStrataProvider() {
   }
 }
 
+const DEEPSEEK_DEFAULT_MIGRATED_KEY = 'settings/consciousness/deepseek-default'
+
+/**
+ * Moves a profile that an older seed pointed at Ollama or Strata to DeepSeek once.
+ * The marker keeps a later choice by the owner, so the default does not fight the settings page.
+ */
+function seedDeepSeekAsDefault() {
+  const apiKey = import.meta.env.VITE_DEFAULT_DEEPSEEK_API_KEY
+  if (!isNonEmptyString(apiKey))
+    return
+  if (localStorage.getItem(DEEPSEEK_DEFAULT_MIGRATED_KEY) === 'true')
+    return
+
+  const model = isNonEmptyString(import.meta.env.VITE_DEFAULT_DEEPSEEK_MODEL)
+    ? import.meta.env.VITE_DEFAULT_DEEPSEEK_MODEL
+    : 'deepseek-flash'
+
+  writeRawString(localStorage, STORAGE_KEY.activeProvider, PROVIDER_ID)
+  writeRawString(localStorage, STORAGE_KEY.activeModel, model)
+
+  const defaults = readJson(localStorage, SPEECH_STORAGE_KEY.moduleDefaults)
+  if (defaults && typeof defaults === 'object' && !Array.isArray(defaults)) {
+    const moduleDefaults = defaults as { consciousness?: unknown }
+    const consciousness = moduleDefaults.consciousness && typeof moduleDefaults.consciousness === 'object' && !Array.isArray(moduleDefaults.consciousness)
+      ? moduleDefaults.consciousness as Record<string, unknown>
+      : {}
+    const provider = consciousness.provider
+    if (!isNonEmptyString(provider) || provider === 'ollama' || provider === 'strata') {
+      moduleDefaults.consciousness = { ...consciousness, provider: PROVIDER_ID, model }
+      writeJson(localStorage, SPEECH_STORAGE_KEY.moduleDefaults, moduleDefaults)
+    }
+  }
+
+  localStorage.setItem(DEEPSEEK_DEFAULT_MIGRATED_KEY, 'true')
+}
+
 export function seedDefaultProvider() {
   if (typeof localStorage === 'undefined')
     return
@@ -529,5 +565,12 @@ export function seedDefaultProvider() {
   }
   catch (error) {
     console.error('Failed to seed the default speech provider:', error)
+  }
+
+  try {
+    seedDeepSeekAsDefault()
+  }
+  catch (error) {
+    console.error('Failed to make DeepSeek the default chat model:', error)
   }
 }

@@ -85,6 +85,9 @@ for (const [name, source] of Object.entries(settingsSearchModules))
 const pinia = createPinia()
 const synced = setupSynced()
 pinia.use(synced.pinia)
+seedDefaultDeepSeek()
+seedDefaultMemoryServer()
+seedDefaultSpeech()
 
 setupMikaTools(pinia)
 
