@@ -1,5 +1,5 @@
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
-import { MikaClient } from '@proj-airi/stage-shared/mika'
+import { isMikaConversationId, MikaClient } from '@proj-airi/stage-shared/mika'
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
@@ -13,9 +13,9 @@ export const useMikaSettingsStore = defineStore('mika-settings', () => {
   const token = useLocalStorageManualReset<string>('settings/mika/token', '')
   const conversation = useLocalStorageManualReset<string>('settings/mika/conversation', '')
 
-  // One conversation keeps Mika's context across tasks from this install.
-  if (!conversation.value)
-    conversation.value = `airi-${crypto.randomUUID()}`
+  // Earlier builds stored an id that Mika never accepts. Drop it.
+  if (conversation.value && !isMikaConversationId(conversation.value))
+    conversation.value = ''
 
   const supported = computed(() => isMikaSupported())
 
@@ -50,6 +50,17 @@ export const useMikaSettingsStore = defineStore('mika-settings', () => {
     })
   }
 
+  /** The conversation that Mika returned for an earlier task, if it is still valid. */
+  function currentConversation(): string | undefined {
+    return isMikaConversationId(conversation.value) ? conversation.value : undefined
+  }
+
+  /** Saves the conversation that Mika returns when it starts a task. */
+  function rememberConversation(id: string | undefined) {
+    if (isMikaConversationId(id) && id !== conversation.value)
+      conversation.value = id
+  }
+
   function resetState() {
     enabled.reset()
     baseUrl.reset()
@@ -65,6 +76,8 @@ export const useMikaSettingsStore = defineStore('mika-settings', () => {
     supported,
     configured,
     createClient,
+    currentConversation,
+    rememberConversation,
     resetState,
   }
 })

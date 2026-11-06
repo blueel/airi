@@ -90,7 +90,15 @@ function formatRunResult(result: MikaRunResult) {
  * finish within the tool call stays on the phone, and a later status call
  * continues from its id.
  */
-export async function createMikaTools(client: MikaClient, options: { conversation?: string }): Promise<Tool[]> {
+export async function createMikaTools(
+  client: MikaClient,
+  options: {
+    /** The conversation from an earlier task. Mika creates one on the first task. */
+    getConversation: () => string | undefined
+    /** Receives the conversation that Mika returns for a task. */
+    onConversation: (id: string | undefined) => void
+  },
+): Promise<Tool[]> {
   return [
     rawTool({
       name: MIKA_RUN_TASK_TOOL_NAME,
@@ -103,8 +111,9 @@ export async function createMikaTools(client: MikaClient, options: { conversatio
 
         try {
           const result = await client.runTask(parsed.output.goal, {
-            conversation: options.conversation,
+            conversation: options.getConversation(),
             waitSeconds: parsed.output.wait_seconds,
+            onProgress: task => options.onConversation(task.conversation),
           })
           return formatRunResult(result)
         }
@@ -229,7 +238,10 @@ export const useMikaToolsStore = defineStore('mika-tools', () => {
         return
       }
 
-      const tools = await createMikaTools(client, { conversation: settings.conversation })
+      const tools = await createMikaTools(client, {
+        getConversation: () => settings.currentConversation(),
+        onConversation: id => settings.rememberConversation(id),
+      })
       if (current !== generation)
         return
 
@@ -270,7 +282,7 @@ export function setupMikaTools(pinia: Pinia) {
   const settings = useMikaSettingsStore(pinia)
 
   watchDebounced(
-    () => [settings.enabled, settings.baseUrl, settings.token, settings.conversation].join('\u0000'),
+    () => [settings.enabled, settings.baseUrl, settings.token].join('\u0000'),
     () => { void tools.refresh() },
     { debounce: 400, immediate: true },
   )

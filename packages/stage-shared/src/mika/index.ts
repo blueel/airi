@@ -284,6 +284,17 @@ export function normalizeMikaBaseUrl(input: string): string {
   return url.toString().replace(/\/+$/, '')
 }
 
+const conversationPattern = /^mcp-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/**
+ * Whether a string is a conversation id that Mika created.
+ *
+ * Mika rejects every other value, including ids that a caller invents.
+ */
+export function isMikaConversationId(value: string | undefined): value is string {
+  return value !== undefined && conversationPattern.test(value)
+}
+
 export function isTerminalMikaStatus(status: MikaTaskStatus): boolean {
   return status === 'done' || status === 'failed' || status === 'cancelled'
 }
@@ -364,6 +375,9 @@ export class MikaClient {
   }
 
   async createTask(goal: string, options?: { conversation?: string, requestId?: string }): Promise<MikaTask> {
+    if (options?.conversation && !isMikaConversationId(options.conversation))
+      throw new Error('The conversation id must come from an earlier Mika task.')
+
     const { status, body } = await this.requestJson('POST', '/tasks', {
       goal,
       ...(options?.conversation ? { conversation: options.conversation } : {}),
