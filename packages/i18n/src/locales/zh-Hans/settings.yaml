@@ -2356,6 +2356,37 @@ pages:
     general:
       description: 深色主题、语言等选项
       title: 通用
+    floating-assistant:
+      title: 屏幕悬浮球
+      description: 不离开当前应用，也能让 AIRI 看看你的屏幕。
+      status:
+        bubble: 悬浮球
+        running: 运行中
+        stopped: 已关闭
+        overlay: 显示在其他应用上层
+        granted: 已允许
+        denied: 未允许
+      enable:
+        label: 打开屏幕悬浮球
+        busy: 正在打开权限...
+      disable:
+        label: 关闭屏幕悬浮球
+      notice:
+        title: 开始之前
+        body: Android 会先要求「显示在其他应用上层」权限，再要求屏幕录制权限。这两个权限都保存在这台手机的系统设置里。
+        background: 悬浮球会让 AIRI 保持后台运行。在任意应用里点击它，AIRI 会截取屏幕，把截图发到当前对话，并朗读回复。
+        voice: AIRI 会用语音回复。请先配置语音服务。
+        vision: 当前对话模型不能读图，也没有配置视觉模型。请先配置，否则无法理解截图。
+        notifications-denied: 通知权限已关闭，悬浮球运行时没有可见通知。你也可以在系统通知设置里停止它。
+      actions:
+        open-vision: 打开视觉设置
+        open-speech: 打开语音设置
+      errors:
+        status: 无法读取悬浮球状态。
+        start: 无法打开屏幕悬浮球。
+        stop: 无法关闭屏幕悬浮球。
+        not-running: 悬浮球没有启动。请检查权限后重试。
+      native-only: 屏幕悬浮球仅在 Android 应用中可用。
     mika:
       title: 手机操控
       description: 让 AIRI 把任务交给手机上的 Mika 操作其他应用。

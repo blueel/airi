@@ -28,6 +28,7 @@ class MainActivity : BridgeActivity() {
 
     override fun load() {
         registerPlugin(AppUpdaterPlugin::class.java)
+        registerPlugin(FloatingBubblePlugin::class.java)
         registerPlugin(MicrophonePermissionPlugin::class.java)
         registerPlugin(MikaBridgePlugin::class.java)
         registerPlugin(WebAuthenticationPlugin::class.java)

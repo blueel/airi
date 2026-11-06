@@ -37,12 +37,20 @@ const sections = computed(() => [
     icon: 'i-solar:smartphone-bold-duotone',
     items: [
       ...(isAndroid
-        ? [{
-            title: t('settings.pages.system.mika.title'),
-            description: t('settings.pages.system.mika.description'),
-            icon: 'i-solar:smartphone-bold-duotone',
-            to: '/settings/system/mika',
-          }]
+        ? [
+            {
+              title: t('settings.pages.system.floating-assistant.title'),
+              description: t('settings.pages.system.floating-assistant.description'),
+              icon: 'i-solar:screen-share-bold-duotone',
+              to: '/settings/system/floating-assistant',
+            },
+            {
+              title: t('settings.pages.system.mika.title'),
+              description: t('settings.pages.system.mika.description'),
+              icon: 'i-solar:smartphone-bold-duotone',
+              to: '/settings/system/mika',
+            },
+          ]
         : []),
       {
         title: t('settings.pages.system.permissions.title'),

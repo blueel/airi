@@ -445,6 +445,9 @@ status:
   sign-in-unconfirmed: 未能确认登录会话，请重新登录。
   dismiss: 关闭提示
   configure-hearing: 请先在设置中选择并配置听觉服务。
+floating-assistant:
+  prompt: 这是我手机的屏幕截图。看看我在做什么，用简短的话告诉我。用我的语言回答。
+  failed: AIRI 没能看懂这张屏幕截图。
 model-assets:
   retry: 重试
   errors:

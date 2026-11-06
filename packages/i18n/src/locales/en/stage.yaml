@@ -449,6 +449,10 @@ status:
   dismiss: Dismiss
   configure-hearing: Select and configure a Hearing provider in Settings.
 
+floating-assistant:
+  prompt: This is a screenshot of my phone screen. Look at it and tell me briefly what you see and what I am doing. Answer in my language.
+  failed: AIRI could not read the screen.
+
 model-assets:
   retry: Retry
   errors:

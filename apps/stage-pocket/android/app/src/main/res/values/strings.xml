@@ -4,4 +4,12 @@
     <string name="title_activity_main">AIRI</string>
     <string name="package_name">ai.moeru.airi_pocket</string>
     <string name="custom_url_scheme">ai.moeru.airi_pocket</string>
+    <string name="floating_bubble_channel_name">Screen bubble</string>
+    <string name="floating_bubble_channel_description">Keeps the AIRI bubble available over other apps.</string>
+    <string name="floating_bubble_notification_title">AIRI screen bubble</string>
+    <string name="floating_bubble_notification_body">Tap the bubble to show AIRI your screen.</string>
+    <string name="floating_bubble_notification_stop">Stop</string>
+    <string name="floating_bubble_overlay_denied">Allow AIRI to display over other apps, then try again.</string>
+    <string name="floating_bubble_capture_denied">Screen capture permission was denied.</string>
+    <string name="floating_bubble_start_failed">Could not start the screen bubble.</string>
 </resources>

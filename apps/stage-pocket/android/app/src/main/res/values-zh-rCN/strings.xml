@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="floating_bubble_channel_name">屏幕悬浮球</string>
+    <string name="floating_bubble_channel_description">让 AIRI 悬浮球在其他应用上方常驻。</string>
+    <string name="floating_bubble_notification_title">AIRI 屏幕悬浮球</string>
+    <string name="floating_bubble_notification_body">点击悬浮球，让 AIRI 看看你的屏幕。</string>
+    <string name="floating_bubble_notification_stop">停止</string>
+    <string name="floating_bubble_overlay_denied">请先允许 AIRI 显示在其他应用的上层，然后重试。</string>
+    <string name="floating_bubble_capture_denied">你拒绝了屏幕录制权限。</string>
+    <string name="floating_bubble_start_failed">无法启动屏幕悬浮球。</string>
+</resources>

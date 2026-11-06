@@ -3,9 +3,11 @@ import { OnboardingDialog, OnboardingStepAnalyticsNotice, StartupOverlay, Toaste
 import { useStartupResourceTimeout } from '@proj-airi/stage-ui/composables/use-startup-resource-timeout'
 import { usePiniaSynced } from '@proj-airi/stage-ui/libs/pinia'
 import { initializeAnalytics, isAnalyticsAvailableInBuild } from '@proj-airi/stage-ui/libs/product-signals'
+import { useAudioContext } from '@proj-airi/stage-ui/stores/audio'
 import { useAuthStore } from '@proj-airi/stage-ui/stores/auth'
 import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/character'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
+import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
 import { useModsServerChannelStore } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
 import { useContextBridgeStore } from '@proj-airi/stage-ui/stores/mods/api/context-bridge'
@@ -29,6 +31,7 @@ import { toast, Toaster } from 'vue-sonner'
 
 import OnboardingPermissionsStep from './components/onboarding/step-permissions.vue'
 
+import { installFloatingAssistantCapture } from './modules/floating-assistant-capture'
 import { getHostWebSocketConnector } from './modules/websocket-bridge'
 
 const contextBridgeStore = useContextBridgeStore()
@@ -47,6 +50,8 @@ const { showingSetup } = storeToRefs(onboardingStore)
 const { isDark } = useTheme()
 const cardStore = useAiriCardStore()
 const chatStore = useChatStore()
+const chatSessionStore = useChatSessionStore()
+const audioContextStore = useAudioContext()
 const startup = useStartupResourcesStore()
 startup.reset()
 startup.register(['auth', 'modelIndex', 'card', 'chat', 'services', 'modelData', 'modelSelection', 'audio', 'route', 'model'])
@@ -133,6 +138,7 @@ async function loadStartup() {
 }
 
 onMounted(() => {
+  installFloatingAssistantCapture({ audioContext: audioContextStore, chat: chatStore, chatSession: chatSessionStore })
   void startup.run('route', () => router.isReady()).catch(error => console.error('Initial route failed:', error))
   void loadStartup()
 })
