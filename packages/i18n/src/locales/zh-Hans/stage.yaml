@@ -104,6 +104,7 @@ chat:
     add: 添加
     images: 图片
     call: 语音通话
+    watch-along: 陪看
   call:
     title: 语音通话
     listening: 正在聆听
@@ -275,6 +276,37 @@ chat:
     ocr-loading-hint: 第一次要加载约 15 MB 模型，十几秒后就好了。
     message-header: 直播间观众正在说话：
     message-request: 挑一两条自然回应他们，不要逐条复述。
+  watch-along:
+    title: 陪看 / 陪玩
+    description: AIRI 陪你看屏幕，看到有意思的变化就说一句。
+    preview-empty: 第一次查看会在一个间隔后出现。
+    browser-source: 浏览器会询问要陪看的屏幕或窗口。画面会发给你配置的视觉模型。
+    android-source: 这个模式使用屏幕悬浮球的画面。陪看期间请保持悬浮球运行。
+    android-hint: 先打开屏幕悬浮球，AIRI 才能看到屏幕。
+    open-bubble: 打开屏幕悬浮球设置
+    open-vision: 打开视觉设置
+    start: 开始陪看
+    stop: 停止陪看
+    starting: 正在开始…
+    status-idle: 未在陪看
+    status-starting: 正在等待屏幕…
+    status-reading: 正在看屏幕…
+    status-watching: 正在陪你看
+    status-count: 已说 {count} 句
+    last-look: 上次查看 {time}
+    interval: 查看间隔
+    interval-seconds: '{seconds} 秒'
+    notice: 画面会发给你配置的视觉模型。随时可以停止。
+    badge: 陪看
+    message-header: 你正在陪主人看屏幕，下面是画面里正在发生的事：
+    message-request: 如果有合适的短反应，就用角色口吻说一句。没有就什么都不说。不要提到这次检查。
+    errors:
+      vision: 请先配置视觉模型，才能使用陪看。
+      unsupported: 这个浏览器不支持屏幕共享。请在电脑上打开，或在 Android 上启动屏幕悬浮球。
+      capture: 无法读取屏幕。
+      start: 无法开始陪看。
+      read: 无法理解屏幕内容。
+      bubble-not-running: 请先打开屏幕悬浮球，AIRI 才能看到屏幕。
   message:
     character-name:
       core-system: 核心系统

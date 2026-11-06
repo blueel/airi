@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ChatLiveRoomDialog } from '@proj-airi/stage-ui/components/scenarios/chat'
+import { ChatLiveRoomDialog, ChatWatchAlongDialog } from '@proj-airi/stage-ui/components/scenarios/chat'
 import { useAutoSpeakStore } from '@proj-airi/stage-ui/stores/auto-speak'
 import { useLiveRoomStore } from '@proj-airi/stage-ui/stores/live-room'
+import { useWatchAlongStore } from '@proj-airi/stage-ui/stores/watch-along'
 import { useTheme } from '@proj-airi/ui'
 import { useLocalStorage } from '@vueuse/core'
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger } from 'reka-ui'
@@ -20,6 +21,8 @@ const autoSpeak = useAutoSpeakStore()
 const autoSpeakLabel = computed(() => t(autoSpeak.enabled ? 'stage.chat.auto-speak.stop' : 'stage.chat.auto-speak.start'))
 const liveRoom = useLiveRoomStore()
 const liveRoomOpen = ref(false)
+const watchAlong = useWatchAlongStore()
+const watchAlongOpen = ref(false)
 
 // The button shows the current theme, and its label tells what a press selects.
 const themeIcons = {
@@ -50,7 +53,24 @@ const sendModeLabels = computed<Record<SendMode, string>>(() => ({
   <ActionAbout v-model="aboutOpen" hide-trigger />
   <BackgroundDialogPicker v-model="backgroundDialogOpen" />
   <ChatLiveRoomDialog v-model="liveRoomOpen" />
+  <ChatWatchAlongDialog v-model="watchAlongOpen" />
   <div absolute bottom--8 right-0 flex gap-2>
+    <!-- Watches the shared screen and comments on what is happening. -->
+    <ChatToolbarButton
+      data-testid="watch-along-toggle"
+      :active="watchAlong.running"
+      :aria-pressed="watchAlong.running"
+      :title="t('stage.chat.watch-along.title')"
+      :aria-label="t('stage.chat.watch-along.title')"
+      @click="watchAlongOpen = true"
+    >
+      <div
+        :class="[
+          watchAlong.running ? 'i-solar:eye-bold-duotone' : 'i-solar:eye-outline',
+          'size-5',
+        ]"
+      />
+    </ChatToolbarButton>
     <!-- Reads the viewer comments of the live room from a region of the shared screen. -->
     <ChatToolbarButton
       data-testid="live-room-toggle"

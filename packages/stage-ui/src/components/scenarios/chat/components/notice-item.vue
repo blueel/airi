@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 
 import HitPill from './hit-pill.vue'
 
-import { AUTO_SPEAK_NOTICE_SOURCE, LIVE_ROOM_NOTICE_SOURCE, PROACTIVE_NOTICE_SOURCE } from '../../../../constants/chat'
+import { AUTO_SPEAK_NOTICE_SOURCE, LIVE_ROOM_NOTICE_SOURCE, PROACTIVE_NOTICE_SOURCE, WATCH_ALONG_NOTICE_SOURCE } from '../../../../constants/chat'
 import { extractMessageText } from '../../../../libs/chat-sync'
 import { liveRoomCommentKey, parseLiveRoomComments } from '../../../../libs/live-room'
 
@@ -34,6 +34,20 @@ const herOwnLine = computed(() => {
 })
 /** Comments that the room reader wrote into the conversation. They show as the viewers wrote them, not as a report. */
 const isLiveRoom = computed(() => props.message.notice?.source === LIVE_ROOM_NOTICE_SOURCE)
+/** One description of the owner's screen that the companion mode saw. Only the description shows, not the prompt. */
+const isWatchAlong = computed(() => props.message.notice?.source === WATCH_ALONG_NOTICE_SOURCE)
+const watchAlongDescription = computed(() => {
+  if (!isWatchAlong.value)
+    return ''
+
+  const header = t('stage.chat.watch-along.message-header')
+  const request = t('stage.chat.watch-along.message-request')
+  return text.value
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && line !== header && line !== request)
+    .join('\n')
+})
 const roomComments = computed(() => {
   if (!isLiveRoom.value)
     return []
@@ -78,6 +92,21 @@ function rowKey(comment: { name: string, text: string }, index: number) {
         <span :class="['text-neutral-700 dark:text-neutral-200']">{{ comment.text }}</span>
       </li>
     </ul>
+  </div>
+  <div
+    v-else-if="isWatchAlong && watchAlongDescription"
+    :class="[
+      'mx-auto max-w-[92%] flex flex-col gap-1 rounded-2xl px-3 py-2',
+      props.surface === 'opaque' ? 'bg-neutral-100' : 'bg-neutral-100/80 dark:bg-neutral-800/60',
+    ]"
+  >
+    <span :class="['flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-500']">
+      <span aria-hidden="true" :class="['i-solar:eye-outline size-3']" />
+      {{ t('stage.chat.watch-along.badge') }}
+    </span>
+    <p :class="['text-xs leading-relaxed break-words text-neutral-700 dark:text-neutral-200']">
+      {{ watchAlongDescription }}
+    </p>
   </div>
   <HitPill
     v-else-if="!herOwnLine"

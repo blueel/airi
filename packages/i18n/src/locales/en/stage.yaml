@@ -104,6 +104,7 @@ chat:
     add: Add
     images: Images
     call: Voice call
+    watch-along: Watch along
   call:
     mute: Mute the microphone
     unmute: Unmute the microphone
@@ -268,6 +269,37 @@ chat:
     ocr-loading-hint: The first read loads about 15 MB of models, which takes a few seconds.
     message-header: 'Viewers in the live room are saying:'
     message-request: Answer one or two of them naturally, without repeating each line.
+  watch-along:
+    title: Watch along
+    description: AIRI looks at the screen with you and says a short line when something happens.
+    preview-empty: The first look happens after one interval.
+    browser-source: The browser asks which screen or window to watch. Frames go to your vision provider.
+    android-source: This mode uses the screen bubble's capture. Keep the bubble running while you watch.
+    android-hint: Start the screen bubble first, so AIRI can see the screen.
+    open-bubble: Open screen bubble settings
+    open-vision: Open vision settings
+    start: Start watching
+    stop: Stop watching
+    starting: Starting…
+    status-idle: Not watching
+    status-starting: Waiting for the screen…
+    status-reading: Looking at the screen…
+    status-watching: Watching with you
+    status-count: '{count} comments'
+    last-look: Last look {time}
+    interval: Look every
+    interval-seconds: '{seconds}s'
+    notice: Frames go to the vision provider you configured. Stop at any time.
+    badge: Watch along
+    message-header: 'You are watching the screen with the owner. This is what is happening:'
+    message-request: If a short reaction fits, say one line in character. If not, reply with nothing. Do not mention this check.
+    errors:
+      vision: Set up a vision provider to use watch along.
+      unsupported: This browser cannot share a screen. Open the app on a computer, or start the screen bubble on Android.
+      capture: Could not read the screen.
+      start: Could not start watch along.
+      read: Could not understand the screen.
+      bubble-not-running: Start the screen bubble first, so AIRI can see the screen.
   message:
     character-name:
       airi: AIRI

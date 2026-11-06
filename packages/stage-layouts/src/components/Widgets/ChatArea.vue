@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { ChatComposerController, ChatImageAttachment } from '@proj-airi/stage-ui/components/scenarios/chat'
 
-import { ChatComposerAddMenu, ChatComposerVoiceInput, ChatImageAttachmentPreview, ChatProviderSetupCallout, ChatReplyPreview, ChatSendButton, useChatImages, useStartVoiceCall, VoicePresence } from '@proj-airi/stage-ui/components/scenarios/chat'
+import { ChatComposerAddMenu, ChatComposerVoiceInput, ChatImageAttachmentPreview, ChatProviderSetupCallout, ChatReplyPreview, ChatSendButton, ChatWatchAlongDialog, useChatImages, useStartVoiceCall, VoicePresence } from '@proj-airi/stage-ui/components/scenarios/chat'
 import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
 import { useConsciousnessStore } from '@proj-airi/stage-ui/stores/modules/consciousness'
 import { useSettings } from '@proj-airi/stage-ui/stores/settings'
 import { useVoiceCallStore } from '@proj-airi/stage-ui/stores/voice-call'
+import { useWatchAlongStore } from '@proj-airi/stage-ui/stores/watch-along'
 import { BasicButton, BasicTextarea } from '@proj-airi/ui'
 import { useLocalStorage } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
@@ -30,6 +31,8 @@ const voicePending = shallowRef(false)
 const voiceRecording = shallowRef(false)
 const router = useRouter()
 const call = useVoiceCallStore()
+const watchAlong = useWatchAlongStore()
+const watchAlongOpen = ref(false)
 const startVoiceCall = useStartVoiceCall(route => router.push(route), () => !voiceRecording.value)
 
 const imageInput = useTemplateRef<HTMLInputElement>('imageInput')
@@ -145,6 +148,7 @@ watch(replyTarget, async (target) => {
 </script>
 
 <template>
+  <ChatWatchAlongDialog v-model="watchAlongOpen" />
   <!--
     Speech and drafts show above the composer, also during a call. The text field below stays free while the user
     speaks. The call capsule at the top of the page holds the call status and the hang-up button.
@@ -218,7 +222,7 @@ watch(replyTarget, async (target) => {
 
       <!-- The toolbar inside the composer, like the desktop app: add menu, recording status, microphone, and send. -->
       <div :class="['absolute inset-x-1.5 bottom-1.5 z-10 flex items-center gap-1.5']">
-        <ChatComposerAddMenu :in-call="call.active" :recording="voiceRecording" @attach-images="imageInput?.click()" @call="startVoiceCall" />
+        <ChatComposerAddMenu :in-call="call.active" :recording="voiceRecording" :watching="watchAlong.running" @attach-images="imageInput?.click()" @call="startVoiceCall" @watch-along="watchAlongOpen = true" />
         <!-- The recording status and the walkie-talkie bar show here, so the composer keeps its height. -->
         <div ref="voiceStatus" data-testid="composer-voice-status" :class="['relative h-9 min-w-0 flex-1 rounded-full']" />
         <!-- A call listens already, so the microphone becomes the mute button of the call. -->

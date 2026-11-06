@@ -4,6 +4,7 @@
     <string name="floating_bubble_channel_description">让 AIRI 悬浮球在其他应用上方常驻。</string>
     <string name="floating_bubble_notification_title">AIRI 屏幕悬浮球</string>
     <string name="floating_bubble_notification_body">点击看屏幕，长按说话。</string>
+    <string name="floating_bubble_notification_body_wake_word">说「%1$s」或长按说话。</string>
     <string name="floating_bubble_notification_stop">停止</string>
     <string name="floating_bubble_overlay_denied">请先允许 AIRI 显示在其他应用的上层，然后重试。</string>
     <string name="floating_bubble_capture_denied">你拒绝了屏幕录制权限。</string>
@@ -12,6 +13,12 @@
     <string name="floating_bubble_voice_unavailable">这台手机没有可用的语音识别服务。</string>
     <string name="floating_bubble_voice_empty">没有听清，请再说一次。</string>
     <string name="floating_bubble_voice_failed">语音识别失败，请重试。</string>
+    <string name="floating_bubble_wake_word_missing">请先为角色添加唤醒词。</string>
+    <string name="floating_bubble_wake_word_too_long">唤醒词太长了。</string>
+    <string name="floating_bubble_wake_word_permission">请先允许麦克风权限，AIRI 才能听到唤醒词。</string>
+    <string name="floating_bubble_wake_word_unavailable">这台手机没有可用的语音识别服务，无法使用唤醒词。</string>
+    <string name="floating_bubble_wake_word_failed">唤醒词监听已停止，请重试。</string>
+    <string name="floating_bubble_watch_unavailable">请先打开屏幕悬浮球，AIRI 才能看到屏幕。</string>
     <string name="install_accessibility_label">AIRI 自动安装</string>
     <string name="install_accessibility_description">在系统安装界面自动点击「安装」，用于 AIRI 自己的更新。Android 不允许普通应用完全静默安装。</string>
 </resources>

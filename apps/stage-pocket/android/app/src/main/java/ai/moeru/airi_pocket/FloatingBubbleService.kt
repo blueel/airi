@@ -86,6 +86,11 @@ class FloatingBubbleService : Service() {
         var hasProjection: Boolean = false
             private set
 
+        /** The running service, so the plugin can apply a wake word change without another intent. */
+        @Volatile
+        var instance: FloatingBubbleService? = null
+            private set
+
         private const val TAG = "FloatingBubbleService"
         private const val CHANNEL_ID = "floating_bubble"
         private const val NOTIFICATION_ID = 4102
@@ -97,6 +102,8 @@ class FloatingBubbleService : Service() {
         private const val BUBBLE_TAP_FLASH_DURATION_MS = 200L
         private const val BUBBLE_TAP_HIDE_DELAY_MS = 120L
         private const val BUBBLE_LONG_PRESS_MS = 450L
+        /** The wake loop releases the microphone before hold-to-talk opens it again. */
+        private const val HOLD_TO_TALK_START_DELAY_MS = 220L
         private const val VOICE_MAX_DURATION_MS = 30_000L
         private const val VOICE_PULSE_DURATION_MS = 650L
         private const val VOICE_ALPHA_MIN = 0.16f
@@ -109,6 +116,8 @@ class FloatingBubbleService : Service() {
         private const val BUBBLE_SCREEN_FRACTION = 0.62f
         private const val MAX_CAPTURE_SIDE = 1280
         private const val CAPTURE_TIMEOUT_MS = 2_500L
+        /** A watch loop never reads more often than this, whatever interval the panel asks for. */
+        private const val MIN_WATCH_INTERVAL_MS = 15_000L
         /** The bubble leaves the frame before the capture, so the screenshot holds only the owner's screen. */
         private const val BUBBLE_HIDE_DELAY_MS = 140L
     }
@@ -118,6 +127,28 @@ class FloatingBubbleService : Service() {
     private val captureThread = HandlerThread("airi-screen-capture").apply { start() }
     private val captureHandler = Handler(captureThread.looper)
     private val capturing = AtomicBoolean(false)
+
+    private var watching = false
+    private var watchIntervalMs = 30_000L
+    private val watchTick = object : Runnable {
+        override fun run() {
+            if (!watching || !isRunning)
+                return
+            if (hasProjection)
+                requestWatchFrame()
+            mainHandler.postDelayed(this, watchIntervalMs)
+        }
+    }
+
+    private var wakeWordListener: WakeWordListener? = null
+    /** The stored wake word configuration. The plugin reads it for the settings page. */
+    var wakeWordConfig = WakeWordConfig(false, emptyList(), Locale.getDefault().toLanguageTag())
+        private set
+    var wakeWordState = WakeWordListener.State.STOPPED
+        private set
+    /** The reason listening stopped, resolved by the plugin for the settings page. */
+    var wakeWordErrorResId: Int? = null
+        private set
 
     private var windowManager: WindowManager? = null
     private var bubbleView: View? = null
@@ -153,6 +184,9 @@ class FloatingBubbleService : Service() {
     override fun onCreate() {
         super.onCreate()
         isRunning = true
+        instance = this
+        wakeWordConfig = WakeWordSettings.read(this)
+        wakeWordListener = WakeWordListener(this, wakeWordCallbacks)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
     }
@@ -174,6 +208,7 @@ class FloatingBubbleService : Service() {
         startForegroundWithProjection()
         startProjection(resultCode, resultData)
         addBubble()
+        wakeWordListener?.updateConfig(wakeWordConfig)
         return START_NOT_STICKY
     }
 
@@ -196,6 +231,11 @@ class FloatingBubbleService : Service() {
         }
         speechRecognizer?.destroy()
         speechRecognizer = null
+        wakeWordListener?.destroy()
+        wakeWordListener = null
+        wakeWordState = WakeWordListener.State.STOPPED
+        stopWatching()
+        instance = null
         snapAnimator?.cancel()
         snapAnimator = null
         alphaAnimator?.cancel()
@@ -241,16 +281,38 @@ class FloatingBubbleService : Service() {
 
     private fun startForegroundWithProjection() {
         val notification = buildNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION,
-            )
-        }
-        else {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification)
+            return
         }
+
+        val projection = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+        try {
+            startForeground(NOTIFICATION_ID, notification, foregroundServiceTypes())
+        }
+        catch (error: Exception) {
+            // Android 14 can reject the microphone type when the owner denied it. The bubble still needs the projection.
+            Log.w(TAG, "Could not start the foreground service with the microphone type", error)
+            try {
+                startForeground(NOTIFICATION_ID, notification, projection)
+            }
+            catch (fallbackError: Exception) {
+                Log.e(TAG, "Could not start the foreground service", fallbackError)
+                stopSelf()
+            }
+        }
+    }
+
+    /** The projection type is always present. The microphone type is added while the wake word listens. */
+    private fun foregroundServiceTypes(): Int {
+        var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+            && wakeWordConfig.usable
+            && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        ) {
+            types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        }
+        return types
     }
 
     private fun buildNotification(): Notification {
@@ -272,7 +334,12 @@ class FloatingBubbleService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_floating_bubble)
             .setContentTitle(getString(R.string.floating_bubble_notification_title))
-            .setContentText(getString(R.string.floating_bubble_notification_body))
+            .setContentText(
+                if (wakeWordConfig.usable)
+                    getString(R.string.floating_bubble_notification_body_wake_word, wakeWordConfig.phrases.first())
+                else
+                    getString(R.string.floating_bubble_notification_body),
+            )
             .setContentIntent(openIntent)
             .setOngoing(true)
             .setSilent(true)
@@ -660,19 +727,32 @@ class FloatingBubbleService : Service() {
             return
         }
 
-        val recognizer = ensureSpeechRecognizer() ?: return
-        startListeningFeedback()
-        voiceListening = true
-        try {
-            recognizer.startListening(speechRecognizerIntent())
-            scheduleVoiceTimeout()
-        }
-        catch (error: Exception) {
-            Log.e(TAG, "Could not start speech recognition", error)
-            voiceListening = false
-            stopListeningFeedback()
-            notify(R.string.floating_bubble_voice_failed)
-        }
+        wakeWordListener?.setHoldToTalk(true)
+        mainHandler.postDelayed({
+            if (!voiceGestureActive || !voiceHolding) {
+                wakeWordListener?.setHoldToTalk(false)
+                return@postDelayed
+            }
+
+            val recognizer = ensureSpeechRecognizer()
+            if (recognizer == null) {
+                wakeWordListener?.setHoldToTalk(false)
+                return@postDelayed
+            }
+            startListeningFeedback()
+            voiceListening = true
+            try {
+                recognizer.startListening(speechRecognizerIntent())
+                scheduleVoiceTimeout()
+            }
+            catch (error: Exception) {
+                Log.e(TAG, "Could not start speech recognition", error)
+                voiceListening = false
+                stopListeningFeedback()
+                wakeWordListener?.setHoldToTalk(false)
+                notify(R.string.floating_bubble_voice_failed)
+            }
+        }, HOLD_TO_TALK_START_DELAY_MS)
     }
 
     /** Stops hold-to-talk on release and sends the transcript when the recognizer has it. */
@@ -698,6 +778,7 @@ class FloatingBubbleService : Service() {
                 deliverVoice(result)
         }
 
+        wakeWordListener?.setHoldToTalk(false)
         settleBubble(view, params, animate = false)
     }
 
@@ -712,6 +793,7 @@ class FloatingBubbleService : Service() {
             voiceCancelled = true
             speechRecognizer?.cancel()
         }
+        wakeWordListener?.setHoldToTalk(false)
     }
 
     private fun ensureSpeechRecognizer(): SpeechRecognizer? {
@@ -845,12 +927,56 @@ class FloatingBubbleService : Service() {
     }
 
     private fun deliverVoice(text: String) {
+        wakeWordListener?.pauseForReply()
         val plugin = FloatingBubblePlugin.instance
         if (plugin == null) {
             FloatingBubblePlugin.holdTranscript(this, text, openActivity = true)
             return
         }
         plugin.deliverTranscript(text)
+    }
+
+    /** Applies a wake word change from the settings page without a restart. */
+    fun reloadWakeWordSettings() {
+        if (!isRunning)
+            return
+        wakeWordConfig = WakeWordSettings.read(this)
+        wakeWordErrorResId = null
+        startForegroundWithProjection()
+        wakeWordListener?.updateConfig(wakeWordConfig)
+    }
+
+    /** The WebView reports when AIRI speaks, so the microphone does not hear her own voice. */
+    fun setWakeWordSpeaking(speaking: Boolean) {
+        wakeWordListener?.setSpeaking(speaking)
+    }
+
+    private val wakeWordCallbacks = object : WakeWordListener.Callbacks {
+        override fun onWakeWord(phrase: String) {
+            bubbleView?.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            startListeningFeedback()
+        }
+
+        override fun onCommand(text: String) {
+            stopListeningFeedback()
+            deliverVoice(text)
+        }
+
+        override fun onStateChanged(state: WakeWordListener.State) {
+            wakeWordState = state
+            if (state == WakeWordListener.State.LISTENING || state == WakeWordListener.State.COMMAND)
+                wakeWordErrorResId = null
+            if (state == WakeWordListener.State.COMMAND)
+                startListeningFeedback()
+            else
+                stopListeningFeedback()
+        }
+
+        override fun onUnavailable(messageResId: Int) {
+            wakeWordErrorResId = messageResId
+            stopListeningFeedback()
+            notify(messageResId)
+        }
     }
 
     private fun notify(message: Int) {
@@ -943,6 +1069,24 @@ class FloatingBubbleService : Service() {
     }
 
     private fun requestCapture() {
+        captureFrame(hideBubble = true, requireFresh = true, delayMs = BUBBLE_TAP_HIDE_DELAY_MS) { frame ->
+            deliverCapture(frame.dataUrl)
+        }
+    }
+
+    /** One frame for the watch-along. The bubble stays visible, so the screen does not blink on every look. */
+    private fun requestWatchFrame() {
+        captureFrame(hideBubble = false, requireFresh = false, delayMs = 0L) { frame ->
+            deliverWatchFrame(frame.dataUrl, frame.hash)
+        }
+    }
+
+    private fun captureFrame(
+        hideBubble: Boolean,
+        requireFresh: Boolean,
+        delayMs: Long,
+        deliver: (CapturedFrame) -> Unit,
+    ) {
         if (!capturing.compareAndSet(false, true))
             return
 
@@ -956,18 +1100,21 @@ class FloatingBubbleService : Service() {
 
             // Hiding the bubble changes the screen, so the next frame holds no overlay.
             val requestedAt = SystemClock.elapsedRealtime()
-            bubble?.visibility = View.INVISIBLE
+            if (hideBubble)
+                bubble?.visibility = View.INVISIBLE
             mainHandler.postDelayed({
                 if (!isRunning) {
+                    if (hideBubble)
+                        bubble?.visibility = View.VISIBLE
                     capturing.set(false)
                     return@postDelayed
                 }
 
                 captureExecutor.execute {
                     try {
-                        val dataUrl = captureScreen(requestedAt)
-                        if (dataUrl != null)
-                            deliverCapture(dataUrl)
+                        val frame = captureScreen(requestedAt, requireFresh)
+                        if (frame != null)
+                            deliver(frame)
                         else
                             Log.w(TAG, "The screen capture returned no frame")
                     }
@@ -976,16 +1123,17 @@ class FloatingBubbleService : Service() {
                     }
                     finally {
                         mainHandler.post {
-                            bubble?.visibility = View.VISIBLE
+                            if (hideBubble)
+                                bubble?.visibility = View.VISIBLE
                             capturing.set(false)
                         }
                     }
                 }
-            }, BUBBLE_HIDE_DELAY_MS)
-        }, BUBBLE_TAP_HIDE_DELAY_MS)
+            }, if (hideBubble) BUBBLE_HIDE_DELAY_MS else 0L)
+        }, delayMs)
     }
 
-    private fun captureScreen(requestedAt: Long): String? {
+    private fun captureScreen(requestedAt: Long, requireFresh: Boolean): CapturedFrame? {
         if (!ensureCaptureSurface())
             return null
 
@@ -994,7 +1142,7 @@ class FloatingBubbleService : Service() {
             val frame = synchronized(frameLock) {
                 val frame = latestFrame
                 // A frame from before the bubble hid would show the bubble, so wait for a later one.
-                if (frame == null || latestFrameAt < requestedAt)
+                if (frame == null || (requireFresh && latestFrameAt < requestedAt))
                     return@synchronized null
                 latestFrame = null
                 latestFrameAt = 0L
@@ -1003,7 +1151,7 @@ class FloatingBubbleService : Service() {
 
             if (frame != null) {
                 return try {
-                    bitmapToDataUrl(imageToBitmap(frame))
+                    bitmapToFrame(imageToBitmap(frame))
                 }
                 finally {
                     frame.close()
@@ -1021,7 +1169,7 @@ class FloatingBubbleService : Service() {
         } ?: return null
 
         return try {
-            bitmapToDataUrl(imageToBitmap(fallback))
+            bitmapToFrame(imageToBitmap(fallback))
         }
         finally {
             fallback.close()
@@ -1047,7 +1195,7 @@ class FloatingBubbleService : Service() {
         return bitmap
     }
 
-    private fun bitmapToDataUrl(source: Bitmap): String {
+    private fun bitmapToFrame(source: Bitmap): CapturedFrame {
         val scale = min(1f, MAX_CAPTURE_SIDE.toFloat() / max(source.width, source.height))
         val scaled = if (scale < 1f) {
             Bitmap.createScaledBitmap(
@@ -1061,6 +1209,7 @@ class FloatingBubbleService : Service() {
             source
         }
 
+        val hash = FrameHash.averageHash(scaled)
         val output = ByteArrayOutputStream()
         scaled.compress(Bitmap.CompressFormat.JPEG, 72, output)
         if (scaled !== source)
@@ -1068,8 +1217,13 @@ class FloatingBubbleService : Service() {
         source.recycle()
 
         val base64 = Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
-        return "data:image/jpeg;base64,$base64"
+        return CapturedFrame("data:image/jpeg;base64,$base64", hash)
     }
+
+    private data class CapturedFrame(
+        val dataUrl: String,
+        val hash: String,
+    )
 
     private fun deliverCapture(dataUrl: String) {
         val plugin = FloatingBubblePlugin.instance
@@ -1079,6 +1233,28 @@ class FloatingBubbleService : Service() {
         }
         plugin.deliverCapture(dataUrl)
     }
+
+    /** One watch frame is ephemeral. A missing WebView drops it instead of opening the app. */
+    private fun deliverWatchFrame(dataUrl: String, hash: String) {
+        FloatingBubblePlugin.instance?.deliverWatchFrame(dataUrl, hash)
+    }
+
+    /** Starts one screen look per interval while the bubble runs. */
+    fun startWatching(intervalMs: Long) {
+        if (!isRunning || !hasProjection)
+            return
+        watching = true
+        watchIntervalMs = intervalMs.coerceAtLeast(MIN_WATCH_INTERVAL_MS)
+        mainHandler.removeCallbacks(watchTick)
+        mainHandler.postDelayed(watchTick, watchIntervalMs)
+    }
+
+    fun stopWatching() {
+        watching = false
+        mainHandler.removeCallbacks(watchTick)
+    }
+
+    fun isWatching(): Boolean = watching
 
     @Suppress("DEPRECATION")
     private fun screenMetrics(): DisplayMetrics {

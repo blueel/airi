@@ -1,4 +1,4 @@
-export type VisionWorkloadId = 'screen:interpret' | 'screen:understand' | 'screen:ocr' | 'screen:ui-automation' | 'tool:image'
+export type VisionWorkloadId = 'screen:interpret' | 'screen:understand' | 'screen:ocr' | 'screen:ui-automation' | 'screen:companion' | 'tool:image'
 
 export interface VisionWorkloadConfig {
   id: VisionWorkloadId
@@ -46,6 +46,18 @@ export const VISION_WORKLOADS: VisionWorkloadConfig[] = [
     prompt: [
       'Identify actionable UI elements (buttons, inputs, menus).',
       'Return a list of elements with labels and approximate purpose.',
+    ].join('\n'),
+  },
+  {
+    id: 'screen:companion',
+    label: 'Companion watch',
+    description: 'Describe what is happening on screen for a character who watches along.',
+    prompt: [
+      'You are watching the owner\'s screen with them, like a friend sitting beside them.',
+      'Describe what is happening in one or two short sentences. Use the language of the visible content when it is clear. Name the app, game, video, or activity when you can see it.',
+      'Focus on visible action, characters, game state, or dialogue. Ignore private messages, notifications, and personal data.',
+      'If the screen shows nothing notable, reply exactly "nothing".',
+      'Do not give instructions. Do not mention that you are watching a screen.',
     ].join('\n'),
   },
   {

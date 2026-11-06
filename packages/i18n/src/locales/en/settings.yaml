@@ -2598,6 +2598,21 @@ pages:
         microphone: Could not request the microphone permission.
         not-running: The bubble did not start. Check the permissions and try again.
       native-only: The screen bubble is only available in the Android app.
+      wake-word:
+        title: Wake word
+        phrases: 'Listening for {phrases}'
+        no-phrases: Add a wake word to the current character card first.
+        open-settings: Open wake word settings
+        start-bubble: Start the screen bubble to listen in the background.
+        notice: The wake word keeps the microphone open while the bubble runs. Android shows the microphone indicator. Turn it off when you do not need it.
+        status:
+          listening: Listening for the wake word
+          command: Listening for your command
+          paused: Paused while AIRI speaks
+          stopped: Off
+        errors:
+          status: Could not read the wake word status.
+          sync: Could not update the wake word setting.
     mika:
       title: Phone Control
       description: Let AIRI ask Mika on this phone to operate other apps.

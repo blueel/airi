@@ -24,10 +24,11 @@ async function openMenu(props: { inCall?: boolean, recording?: boolean }) {
 }
 
 describe('composerAddMenu', () => {
-  it('offers images and a voice call', async () => {
+  it('offers images, watch-along, and a voice call', async () => {
     const screen = await openMenu({})
 
     await expect.element(screen.getByTestId('composer-add-images')).toBeVisible()
+    await expect.element(screen.getByTestId('composer-add-watch-along')).toBeVisible()
     await expect.element(screen.getByTestId('composer-add-call')).not.toHaveAttribute('data-disabled')
   })
 

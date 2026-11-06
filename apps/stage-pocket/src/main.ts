@@ -37,6 +37,7 @@ import { seedDefaultDeepSeek } from './modules/default-deepseek'
 import { seedDefaultMemoryServer } from './modules/default-memory'
 import { seedDefaultSpeech } from './modules/default-speech'
 import { i18n } from './modules/i18n'
+import { installWatchAlongCapture } from './modules/watch-along'
 import { WebAuthentication } from './modules/web-authentication'
 import { setupMikaTools } from './stores/tools/mika'
 
@@ -93,6 +94,7 @@ seedDefaultMemoryServer()
 seedDefaultSpeech()
 
 setupMikaTools(pinia)
+installWatchAlongCapture()
 
 // TODO: vite-plugin-vue-layouts is long deprecated, replace with another layout solution
 const routeRecords = setupLayouts(routes as RouteRecordRaw[])

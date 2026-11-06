@@ -18,12 +18,15 @@ import android.widget.Toast
 
 import androidx.activity.result.ActivityResult
 
+import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
+
+import java.util.Locale
 
 /**
  * Opens the permissions of the floating bubble and carries its captures and voice transcripts to the WebView.
@@ -121,6 +124,7 @@ class FloatingBubblePlugin : Plugin() {
 
     override fun handleOnDestroy() {
         listenerReady = false
+        FloatingBubbleService.instance?.stopWatching()
         if (instance === this)
             instance = null
         super.handleOnDestroy()
@@ -129,7 +133,86 @@ class FloatingBubblePlugin : Plugin() {
     /** Reports what the settings page can offer. Undenied permissions stay false. */
     @PluginMethod
     fun status(call: PluginCall) {
-        val result = JSObject().apply {
+        call.resolve(statusObject())
+    }
+
+    /**
+     * Stores the wake word phrases and switch. The service applies them at once when it runs, and reads them at the
+     * next start when it does not.
+     */
+    @PluginMethod
+    fun setWakeWord(call: PluginCall) {
+        val enabled = call.getBoolean("enabled") ?: false
+        val rawPhrases = call.getArray("phrases")
+        val phrases = buildList {
+            if (rawPhrases != null) {
+                for (index in 0 until rawPhrases.length()) {
+                    val value = try {
+                        rawPhrases.getString(index)
+                    }
+                    catch (error: Exception) {
+                        null
+                    }
+                    value?.trim()?.takeIf { it.isNotEmpty() }?.let(::add)
+                }
+            }
+        }.distinct().take(WakeWordSettings.MAX_PHRASES)
+
+        if (enabled && phrases.isEmpty()) {
+            call.reject(context.getString(R.string.floating_bubble_wake_word_missing))
+            return
+        }
+        if (phrases.any { it.length > WakeWordSettings.MAX_PHRASE_CHARS }) {
+            call.reject(context.getString(R.string.floating_bubble_wake_word_too_long))
+            return
+        }
+
+        val language = call.getString("language")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: Locale.getDefault().toLanguageTag()
+        val config = WakeWordConfig(enabled, phrases, language)
+        WakeWordSettings.write(context, config)
+        FloatingBubbleService.instance?.reloadWakeWordSettings()
+        call.resolve(statusObject())
+    }
+
+    /** Pauses the wake loop while AIRI speaks, so the microphone does not hear her own voice. */
+    @PluginMethod
+    fun setWakeWordSpeaking(call: PluginCall) {
+        val speaking = call.getBoolean("speaking") ?: false
+        FloatingBubbleService.instance?.setWakeWordSpeaking(speaking)
+        call.resolve()
+    }
+
+    /** Starts the companion frame loop on the bubble's MediaProjection session. */
+    @PluginMethod
+    fun startWatching(call: PluginCall) {
+        val service = FloatingBubbleService.instance
+        if (service == null || !FloatingBubbleService.isRunning || !FloatingBubbleService.hasProjection) {
+            call.reject(context.getString(R.string.floating_bubble_watch_unavailable))
+            return
+        }
+
+        val interval = (call.getInt("intervalMs") ?: 30_000).coerceAtLeast(15_000)
+        service.startWatching(interval.toLong())
+        call.resolve(JSObject().put("watching", true))
+    }
+
+    @PluginMethod
+    fun stopWatching(call: PluginCall) {
+        FloatingBubbleService.instance?.stopWatching()
+        call.resolve()
+    }
+
+    private fun statusObject(): JSObject {
+        val service = FloatingBubbleService.instance
+        val config = service?.wakeWordConfig ?: WakeWordSettings.read(context)
+        val state = service?.wakeWordState ?: WakeWordListener.State.STOPPED
+        val phrases = JSArray()
+        config.phrases.forEach { phrase -> phrases.put(phrase) }
+
+        return JSObject().apply {
             put("supported", true)
             put("overlayPermission", Settings.canDrawOverlays(context))
             put("running", FloatingBubbleService.isRunning)
@@ -138,8 +221,16 @@ class FloatingBubblePlugin : Plugin() {
                 "microphonePermission",
                 context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
             )
+            put("wakeWordEnabled", config.enabled)
+            put("wakeWordState", state.name.lowercase(Locale.ROOT))
+            put(
+                "wakeWordListening",
+                state == WakeWordListener.State.LISTENING || state == WakeWordListener.State.COMMAND,
+            )
+            put("wakeWordPhrases", phrases)
+            service?.wakeWordErrorResId?.let { put("wakeWordError", context.getString(it)) }
+            put("watching", service?.isWatching() == true)
         }
-        call.resolve(result)
     }
 
     /** Marks the WebView ready, after it added its capture and transcript listeners. */
@@ -241,6 +332,21 @@ class FloatingBubblePlugin : Plugin() {
                 return@post
             }
             notifyListeners("transcript", JSObject().put("text", text))
+        }
+    }
+
+    /** Sends one watch frame to the WebView. A missing listener drops it, because a later frame replaces it. */
+    fun deliverWatchFrame(dataUrl: String, hash: String) {
+        if (activity == null || !listenerReady)
+            return
+
+        Handler(Looper.getMainLooper()).post {
+            if (!listenerReady || activity == null)
+                return@post
+            notifyListeners(
+                "watchFrame",
+                JSObject().put("dataUrl", dataUrl).put("hash", hash),
+            )
         }
     }
 

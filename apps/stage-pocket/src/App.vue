@@ -33,6 +33,7 @@ import OnboardingPermissionsStep from './components/onboarding/step-permissions.
 
 import { installFloatingAssistantTurns } from './modules/floating-assistant-turns'
 import { getHostWebSocketConnector } from './modules/websocket-bridge'
+import { useFloatingAssistantWakeWordStore } from './stores/floating-assistant-wake-word'
 
 const contextBridgeStore = useContextBridgeStore()
 const authStore = useAuthStore()
@@ -67,6 +68,7 @@ useHearingStore()
 useSpeechStore()
 useSettingsStageModel()
 useVisionStore()
+useFloatingAssistantWakeWordStore()
 
 let stopAuthenticatedSetup: (() => void) | undefined
 let stopLoggedOutSetup: (() => void) | undefined

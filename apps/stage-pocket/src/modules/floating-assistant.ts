@@ -9,11 +9,19 @@ export interface FloatingAssistantStatus {
   running: boolean
   projection: boolean
   microphonePermission: boolean
+  wakeWordEnabled: boolean
+  wakeWordState: 'stopped' | 'listening' | 'command' | 'paused'
+  wakeWordListening: boolean
+  wakeWordPhrases: string[]
+  wakeWordError?: string
+  /** The companion frame loop runs on the bubble's screen capture session. */
+  watching: boolean
 }
 
 interface FloatingAssistantListener {
   (eventName: 'capture', listener: (capture: { dataUrl: string }) => void): Promise<PluginListenerHandle>
   (eventName: 'transcript', listener: (transcript: { text: string }) => void): Promise<PluginListenerHandle>
+  (eventName: 'watchFrame', listener: (frame: { dataUrl: string, hash?: string }) => void): Promise<PluginListenerHandle>
 }
 
 interface FloatingAssistantPlugin {
@@ -24,6 +32,10 @@ interface FloatingAssistantPlugin {
   consumePendingCapture: () => Promise<{ dataUrl?: string }>
   consumePendingTranscript: () => Promise<{ text?: string }>
   toast: (options: { text: string }) => Promise<void>
+  setWakeWord: (options: { enabled: boolean, phrases: string[], language?: string }) => Promise<FloatingAssistantStatus>
+  setWakeWordSpeaking: (options: { speaking: boolean }) => Promise<void>
+  startWatching: (options: { intervalMs: number }) => Promise<{ watching: boolean }>
+  stopWatching: () => Promise<void>
   addListener: FloatingAssistantListener
 }
 

@@ -4,7 +4,7 @@ import type { ChatHistoryItem } from '@proj-airi/stage-ui/types/chat'
 
 import { useThreeViewControl } from '@proj-airi/stage-ui-three'
 import { CharacterSwitcherDrawer, ChatBackgroundTasks, ChatHistory } from '@proj-airi/stage-ui/components'
-import { ChatComposerAddMenu, ChatComposerVoiceInput, ChatImageAttachmentPreview, ChatProviderSetupCallout, ChatReplyPreview, ChatSessionsDrawer, useChatComposer, useChatImages, useStartVoiceCall, VoiceCallCapsule, VoicePresence } from '@proj-airi/stage-ui/components/scenarios/chat'
+import { ChatComposerAddMenu, ChatComposerVoiceInput, ChatImageAttachmentPreview, ChatProviderSetupCallout, ChatReplyPreview, ChatSessionsDrawer, ChatWatchAlongDialog, useChatComposer, useChatImages, useStartVoiceCall, VoiceCallCapsule, VoicePresence } from '@proj-airi/stage-ui/components/scenarios/chat'
 import { useAnalytics, useAudioAnalyzer } from '@proj-airi/stage-ui/composables'
 import { useAudioContext } from '@proj-airi/stage-ui/stores/audio'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
@@ -16,6 +16,7 @@ import { useConsciousnessStore } from '@proj-airi/stage-ui/stores/modules/consci
 import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
 import { useSettingsStageModel } from '@proj-airi/stage-ui/stores/settings/stage-model'
 import { useVoiceCallStore } from '@proj-airi/stage-ui/stores/voice-call'
+import { useWatchAlongStore } from '@proj-airi/stage-ui/stores/watch-along'
 import { BasicButton, BasicTextarea, ProgressiveBlur } from '@proj-airi/ui'
 import { useFocusWithin } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
@@ -117,6 +118,8 @@ async function handleRetryMessage(index: number) {
 }
 
 const sessionsDrawerOpen = shallowRef(false)
+const watchAlong = useWatchAlongStore()
+const watchAlongOpen = shallowRef(false)
 const mobileInteractiveArea = useTemplateRef<HTMLElement>('mobileInteractiveArea')
 const messageComposer = useTemplateRef<HTMLElement>('messageComposer')
 const inputBubble = useTemplateRef<HTMLElement>('inputBubble')
@@ -317,6 +320,7 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <ChatWatchAlongDialog v-model="watchAlongOpen" />
   <div
     ref="mobileInteractiveArea"
     data-testid="mobile-interactive-area"
@@ -448,6 +452,7 @@ onUnmounted(() => {
           size="md"
           :in-call="call.active"
           :recording="voiceRecording"
+          :watching="watchAlong.running"
           :class="[
             'self-end backdrop-blur-md',
             'border-2 border-solid border-neutral-200/60 bg-neutral-100/80',
@@ -455,6 +460,7 @@ onUnmounted(() => {
           ]"
           @attach-images="imageInput?.click()"
           @call="startVoiceCall"
+          @watch-along="watchAlongOpen = true"
         />
         <input ref="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple :class="['hidden']" @change="selectFiles">
         <div

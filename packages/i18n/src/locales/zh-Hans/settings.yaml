@@ -2391,6 +2391,21 @@ pages:
         microphone: 无法请求麦克风权限。
         not-running: 悬浮球没有启动。请检查权限后重试。
       native-only: 屏幕悬浮球仅在 Android 应用中可用。
+      wake-word:
+        title: 唤醒词
+        phrases: '正在监听：{phrases}'
+        no-phrases: 请先在当前角色卡上添加唤醒词。
+        open-settings: 打开唤醒词设置
+        start-bubble: 先打开屏幕悬浮球，才能在后台监听。
+        notice: 唤醒词会让麦克风在悬浮球运行时保持开启。Android 会显示麦克风指示器。不需要时请关闭。
+        status:
+          listening: 正在监听唤醒词
+          command: 正在听你的指令
+          paused: AIRI 说话时暂停监听
+          stopped: 已关闭
+        errors:
+          status: 无法读取唤醒词状态。
+          sync: 无法更新唤醒词设置。
     mika:
       title: 手机操控
       description: 让 AIRI 把任务交给手机上的 Mika 操作其他应用。

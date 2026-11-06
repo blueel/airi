@@ -6,13 +6,14 @@ import { errorMessageFrom } from '@moeru/std'
 import { useConsciousnessStore } from '@proj-airi/stage-ui/stores/modules/consciousness'
 import { useSpeechStore } from '@proj-airi/stage-ui/stores/modules/speech'
 import { useVisionStore } from '@proj-airi/stage-ui/stores/modules/vision'
-import { Button } from '@proj-airi/ui'
+import { Button, FieldCheckbox } from '@proj-airi/ui'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { FloatingAssistant, isFloatingAssistantSupported } from '../../../modules/floating-assistant'
 import { MicrophonePermission } from '../../../modules/microphone-permission'
+import { useFloatingAssistantWakeWordStore } from '../../../stores/floating-assistant-wake-word'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -20,6 +21,7 @@ const supported = isFloatingAssistantSupported()
 const consciousness = useConsciousnessStore()
 const vision = useVisionStore()
 const speech = useSpeechStore()
+const wakeWord = useFloatingAssistantWakeWordStore()
 
 const status = ref<FloatingAssistantStatus | null>(null)
 const busy = ref(false)
@@ -38,11 +40,31 @@ const imagesHaveReader = computed(() => {
   return modelReadsImages || (vision.configured && vision.useForChat)
 })
 
+/** One line that explains what the native listener does now. */
+const wakeWordStatusText = computed(() => {
+  if (!wakeWord.enabled)
+    return t('settings.pages.system.floating-assistant.wake-word.status.stopped')
+  if (!running.value)
+    return t('settings.pages.system.floating-assistant.wake-word.start-bubble')
+
+  switch (wakeWord.state) {
+    case 'listening':
+      return t('settings.pages.system.floating-assistant.wake-word.status.listening')
+    case 'command':
+      return t('settings.pages.system.floating-assistant.wake-word.status.command')
+    case 'paused':
+      return t('settings.pages.system.floating-assistant.wake-word.status.paused')
+    default:
+      return t('settings.pages.system.floating-assistant.wake-word.status.stopped')
+  }
+})
+
 async function refresh() {
   if (!supported)
     return
   try {
     status.value = await FloatingAssistant.status()
+    void wakeWord.refresh()
   }
   catch (cause) {
     error.value = errorMessageFrom(cause) ?? t('settings.pages.system.floating-assistant.errors.status')
@@ -80,6 +102,8 @@ async function enable() {
     }
     if (!running.value)
       error.value = t('settings.pages.system.floating-assistant.errors.not-running')
+    else
+      void wakeWord.sync()
   }
   catch (cause) {
     error.value = errorMessageFrom(cause) ?? t('settings.pages.system.floating-assistant.errors.start')
@@ -110,6 +134,7 @@ async function disable() {
 async function grantMicrophone() {
   try {
     await MicrophonePermission.requestPermission()
+    await wakeWord.sync()
     await refresh()
   }
   catch (cause) {
@@ -199,6 +224,38 @@ onUnmounted(() => {
       <p v-if="notificationsDenied" :class="['text-sm text-amber-600 dark:text-amber-400']">
         {{ t('settings.pages.system.floating-assistant.notice.notifications-denied') }}
       </p>
+    </div>
+
+    <div
+      v-if="supported"
+      :class="['flex flex-col gap-3 rounded-2xl p-4', 'bg-neutral-100/70 dark:bg-neutral-800/60']"
+    >
+      <FieldCheckbox
+        :model-value="wakeWord.enabled"
+        :disabled="wakeWord.phrases.length === 0 || wakeWord.busy"
+        :label="t('settings.pages.system.floating-assistant.wake-word.title')"
+        :description="wakeWord.phrases.length
+          ? t('settings.pages.system.floating-assistant.wake-word.phrases', { phrases: wakeWord.phrases.join(' / ') })
+          : t('settings.pages.system.floating-assistant.wake-word.no-phrases')"
+        @update:model-value="wakeWord.setEnabled"
+      />
+
+      <p :class="['text-xs text-neutral-500 dark:text-neutral-400']">
+        {{ wakeWordStatusText }}
+      </p>
+      <p v-if="wakeWord.error" :class="['text-sm text-red-500']">
+        {{ wakeWord.error }}
+      </p>
+      <p :class="['text-xs text-neutral-500 dark:text-neutral-400']">
+        {{ t('settings.pages.system.floating-assistant.wake-word.notice') }}
+      </p>
+      <Button
+        v-if="wakeWord.phrases.length === 0"
+        color="primary"
+        variant="secondary"
+        :label="t('settings.pages.system.floating-assistant.wake-word.open-settings')"
+        @click="openSettings('/settings/modules/hearing/wake-words')"
+      />
     </div>
 
     <div

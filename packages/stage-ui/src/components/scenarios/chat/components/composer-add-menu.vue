@@ -23,13 +23,20 @@ const props = withDefaults(defineProps<{
    * @default false
    */
   recording?: boolean
-}>(), { size: 'sm', inCall: false, recording: false })
+  /**
+   * The watch-along mode runs, so the add button carries a small activity dot.
+   * @default false
+   */
+  watching?: boolean
+}>(), { size: 'sm', inCall: false, recording: false, watching: false })
 
 const emit = defineEmits<{
   /** The user asked to attach images. The host opens its file picker. */
   attachImages: []
   /** The user asked to start a voice call. It is a user gesture, so the host can ask for microphone permission. */
   call: []
+  /** The user asked to open the watch-along panel. */
+  watchAlong: []
 }>()
 
 const { t } = useI18n()
@@ -48,7 +55,7 @@ const open = shallowRef(false)
         :title="t('stage.chat.composer.add')"
         :class="[
           props.size === 'md' ? 'size-10' : 'size-9',
-          'shrink-0 flex items-center justify-center rounded-full outline-none',
+          'shrink-0 relative flex items-center justify-center rounded-full outline-none',
           'text-neutral-500 dark:text-neutral-400',
           'hover:bg-primary-100/70 hover:text-primary-600 dark:hover:bg-primary-900/50 dark:hover:text-primary-300',
           'data-[state=open]:bg-primary-100/70 data-[state=open]:text-primary-600 dark:data-[state=open]:bg-primary-900/50 dark:data-[state=open]:text-primary-300',
@@ -60,11 +67,20 @@ const open = shallowRef(false)
           aria-hidden="true"
           :class="['i-mingcute:add-line size-5.5 transition-transform duration-200 motion-reduce:transition-none', open && 'rotate-45']"
         />
+        <span
+          v-if="props.watching"
+          aria-hidden="true"
+          :class="['absolute right-1 top-1 size-2 rounded-full bg-green-500 ring-2 ring-white dark:ring-neutral-900']"
+        />
       </BasicButton>
     </template>
     <MenuItem data-testid="composer-add-images" @select="emit('attachImages')">
       <span :class="['i-mingcute:pic-line size-4.5 shrink-0']" />
       <span>{{ t('stage.chat.composer.images') }}</span>
+    </MenuItem>
+    <MenuItem data-testid="composer-add-watch-along" @select="emit('watchAlong')">
+      <span :class="['i-solar:eye-outline size-4.5 shrink-0']" />
+      <span>{{ t('stage.chat.composer.watch-along') }}</span>
     </MenuItem>
     <MenuItem data-testid="composer-add-call" :disabled="props.inCall || props.recording" @select="emit('call')">
       <span :class="['i-mingcute:phone-line size-4.5 shrink-0']" />
