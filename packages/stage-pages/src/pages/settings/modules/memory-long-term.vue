@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import type { MemorySyncSession } from '@proj-airi/stage-ui/stores/memory-formation'
+
+import { errorMessageFrom } from '@moeru/std'
+import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
 import { useMemoryStore } from '@proj-airi/stage-ui/stores/memory'
+import { useMemoryFormationStore } from '@proj-airi/stage-ui/stores/memory-formation'
 import { Button, FieldCheckbox, FieldInput } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
@@ -8,10 +13,13 @@ import { RouterLink } from 'vue-router'
 
 const { t } = useI18n()
 const memory = useMemoryStore()
-const { autoFormation, backend, enabled, formationModel, formationProvider, serverToken, serverUrl } = storeToRefs(memory)
+const memoryFormation = useMemoryFormationStore()
+const sessions = useChatSessionStore()
+const { autoFormation, backend, enabled, serverToken, serverUrl } = storeToRefs(memory)
 
 const KEY = 'settings.pages.modules.memory-long-term'
 const status = ref('')
+const syncStatus = ref('')
 const busy = ref(false)
 
 const remote = computed({
@@ -48,6 +56,60 @@ async function importLocal() {
     busy.value = false
   }
 }
+
+async function syncHistory() {
+  if (busy.value || !enabled.value)
+    return
+  busy.value = true
+  syncStatus.value = t(`${KEY}.sync.progress`, { calls: 0 })
+  try {
+    await sessions.initialize()
+    const metas = Object.values(sessions.sessionMetas)
+      .filter(meta => meta.characterId && !meta.hidden && !meta.recipeId && !meta.task)
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+
+    const providerId = memory.formationProvider.trim()
+    const model = memory.formationModel.trim()
+    if (!providerId || !model) {
+      syncStatus.value = t(`${KEY}.sync.failed`)
+      return
+    }
+
+    const payloads: MemorySyncSession[] = []
+    for (const meta of metas) {
+      if (!await sessions.loadSession(meta.sessionId))
+        continue
+      const messages = sessions.getSessionMessages(meta.sessionId)
+      if (messages.length < 2)
+        continue
+      payloads.push({
+        sessionId: meta.sessionId,
+        persona: meta.characterId,
+        providerId,
+        model,
+        messages,
+      })
+    }
+
+    if (payloads.length === 0) {
+      syncStatus.value = t(`${KEY}.sync.empty`)
+      return
+    }
+
+    const result = await memoryFormation.syncHistory(payloads, (progress) => {
+      syncStatus.value = t(`${KEY}.sync.progress`, { calls: progress.calls })
+    })
+    syncStatus.value = result.stopped
+      ? t(`${KEY}.sync.stopped`, { calls: result.calls })
+      : t(`${KEY}.sync.done`, { sessions: result.sessions, calls: result.calls })
+  }
+  catch (error) {
+    syncStatus.value = errorMessageFrom(error) ?? t(`${KEY}.sync.failed`)
+  }
+  finally {
+    busy.value = false
+  }
+}
 </script>
 
 <template>
@@ -55,15 +117,18 @@ async function importLocal() {
     <div :class="['flex flex-col', 'gap-4', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">
       <FieldCheckbox v-model="enabled" :label="t(`${KEY}.enable`)" :description="t(`${KEY}.enable-description`)" />
       <FieldCheckbox v-model="autoFormation" :label="t(`${KEY}.auto.label`)" :description="t(`${KEY}.auto.description`)" />
-      <template v-if="autoFormation">
+      <div :class="['flex flex-col', 'gap-2', 'border-t', 'border-neutral-200 dark:border-neutral-800', 'pt-3']">
         <p :class="['text-sm', 'text-neutral-500 dark:text-neutral-400']">
-          {{ t(`${KEY}.model.description`) }}
+          {{ t(`${KEY}.sync.description`) }}
         </p>
-        <div :class="['grid grid-cols-1 gap-3 sm:grid-cols-2']">
-          <FieldInput v-model="formationProvider" :label="t(`${KEY}.model.provider`)" placeholder="ollama" />
-          <FieldInput v-model="formationModel" :label="t(`${KEY}.model.model`)" placeholder="qwen3:4b" />
+        <div :class="['flex flex-wrap', 'gap-2']">
+          <Button size="sm" variant="secondary" icon="i-solar:refresh-circle-linear" :label="t(`${KEY}.sync.start`)" :disabled="busy || !enabled" @click="syncHistory" />
+          <Button v-if="memoryFormation.syncing" size="sm" variant="secondary" icon="i-solar:stop-circle-linear" :label="t(`${KEY}.sync.stop`)" @click="memoryFormation.cancelSync()" />
         </div>
-      </template>
+        <p v-if="syncStatus" :class="['text-sm', 'text-neutral-500 dark:text-neutral-400']">
+          {{ syncStatus }}
+        </p>
+      </div>
     </div>
 
     <div :class="['flex flex-col', 'gap-4', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">

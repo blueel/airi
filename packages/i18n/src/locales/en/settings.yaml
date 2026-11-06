@@ -553,7 +553,7 @@ pages:
         greetings: How your character should say "hello" ?
         systemprompt: Explain here to the AI LLM how it should answer when prompted.
         posthistoryinstructions: Place here anything the AI LLM should read after the messages history.
-        context_window: 'Message limit, including your current message. Leave empty for All. Use 0 to send only your current message. When exceeded, older turns are removed in blocks. Saved chats stay intact.'
+        context_window: 'Message limit, including your current message. Leave empty for the 30-message default. Use 0 to send only your current message. When exceeded, older turns are removed in blocks. Saved chats stay intact.'
         version: >-
           Card version, you should increase this if you are making changes from
           a previous card.
@@ -579,7 +579,7 @@ pages:
     personality: Personality
     posthistoryinstructions: Post-History Instructions
     context_window: Messages to remember
-    context_window_all: All
+    context_window_all: Default (30)
     recent: Recently Added
     scenario: Scenario
     search: Search cards...
@@ -1106,11 +1106,16 @@ pages:
       enable-description: The character remembers what you talk about. When this is off, it remembers nothing.
       auto:
         label: Remember automatically
-        description: After a few turns, the character saves lasting facts in the background. This uses one extra model call.
-      model:
-        description: Leave both fields empty to use the character's chat model. A small local model keeps the extra call cheap and avoids competing with chat.
-        provider: Provider ID
-        model: Model ID
+        description: After every reply, the character saves lasting facts in the background with DeepSeek. This uses one extra model call.
+      sync:
+        description: Use DeepSeek to turn older conversations into long-term memories once. It processes only the parts that memory has not seen, and each run makes at most 40 model calls.
+        start: Sync previous chats
+        stop: Stop
+        progress: 'Syncing… {calls} model calls so far.'
+        done: 'Synced {sessions} conversations with {calls} model calls.'
+        stopped: 'Stopped after {calls} model calls. The next run continues from here.'
+        empty: There are no conversations to sync.
+        failed: The sync failed. Check the chat provider and try again.
       server:
         label: Use a memory server
         description: Keep memories on your computer so your phone and desktop read the same data.

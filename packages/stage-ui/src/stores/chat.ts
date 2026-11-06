@@ -39,7 +39,7 @@ import {
 import { getSpeechBusContext, voiceGenerationEnded } from '../services/speech/bus'
 import { composeDrawCardPrompt, createDrawCardTool, DRAW_CARD_TOOL_NAME, drawCardContent } from '../tools/draw-card'
 import { createJudgeRecipeTool, judgmentSkillText } from '../tools/judge-recipe'
-import { composeMemoryPrompt, composeRetrievedMemoryPrompt, createMemoryTools } from '../tools/memory'
+import { composeMemoryPrompt, composeRecentMemoryPrompt, composeRetrievedMemoryPrompt, createMemoryTools } from '../tools/memory'
 import { createProposeRecipeTool } from '../tools/propose-recipe'
 import { createSearchIconsTool } from '../tools/search-icons'
 import { createUseRecipeTool } from '../tools/use-recipe'
@@ -150,6 +150,9 @@ export interface ChatToolCallRerunPayload extends Omit<ToolCallRerunPayload, 'se
 }
 
 type ProviderHistoryMessage = Exclude<ChatHistoryItem, { role: 'error' }>
+
+/** The message window a card without an explicit context window keeps. Older context comes from memory. */
+const DEFAULT_CONTEXT_WINDOW = 30
 
 function toProviderHistory(messages: ChatHistoryItem[]): Message[] {
   return messages.filter((message): message is ProviderHistoryMessage => message.role !== 'error')
@@ -1076,7 +1079,12 @@ export const useChatStore = defineStore('chat', () => {
     getSystemPromptSupplement: () => llmToolsetPromptsStore.activeToolsetPrompt,
     // Identity follows the session's persona at request time, so a card switch never rewrites another session.
     getSystemPrompt: sessionSystemPrompt,
-    getContextWindow: sessionId => cardStore.getCard(personaOf(sessionId))?.extensions.airi.contextWindow ?? -1,
+    // A card that sets -1 keeps the whole session, which grows without a bound. The default keeps a
+    // bounded window; older context comes from long-term memory.
+    getContextWindow: (sessionId) => {
+      const value = cardStore.getCard(personaOf(sessionId))?.extensions.airi.contextWindow
+      return value === undefined || value < 0 ? DEFAULT_CONTEXT_WINDOW : value
+    },
     runtimeContextProviders: [
       () => createRuntimePromptContext(runtimePrompt.value),
       createMinecraftContext,
@@ -1168,14 +1176,11 @@ export const useChatStore = defineStore('chat', () => {
       const characterId = chatSession.sessionMetas[sessionId]?.characterId
       if (!characterId)
         return
-      const selection = cardStore.getModules(characterId).consciousness
-      if (!selection.provider || !selection.model)
+      // Memory processing uses the dedicated model, not the character's local chat model.
+      const providerId = memory.formationProvider.trim()
+      const model = memory.formationModel.trim()
+      if (!providerId || !model)
         return
-      const dedicatedProvider = memory.formationProvider.trim()
-      const dedicatedModel = memory.formationModel.trim()
-      const useDedicated = Boolean(dedicatedProvider && dedicatedModel)
-      const providerId = useDedicated ? dedicatedProvider : selection.provider
-      const model = useDedicated ? dedicatedModel : selection.model
       const messages = chatSession.getSessionMessages(sessionId)
 
       // A reflection is independent from the per-turn formation, so a full ledger still gets its pass when that is off.
@@ -1338,9 +1343,14 @@ export const useChatStore = defineStore('chat', () => {
 
     signal.throwIfAborted()
 
-    // Start retrieval while the provider and stickers resolve. A slow memory server must not delay the reply.
+    // Start semantic selection and lexical retrieval while the provider and stickers resolve.
+    // The selector reads memory descriptions; the lexical search stays as a fast fallback.
+    const persona = personaOf(payload.sessionId)
+    const memorySelection = memory.enabled
+      ? memory.selectRelevant(payload.text, persona, 6, { timeoutMs: 2_000, signal })
+      : Promise.resolve([])
     const memoryRetrieval = memory.enabled
-      ? memory.retrieve(payload.text, personaOf(payload.sessionId), 8, { timeoutMs: 150 })
+      ? memory.retrieve(payload.text, persona, 8, { timeoutMs: 150 })
       : Promise.resolve([])
 
     // Typed and voice turns use the character that owns the session, not the selected card.
@@ -1362,7 +1372,25 @@ export const useChatStore = defineStore('chat', () => {
     if (controlEvents?.length)
       supplements.push(`Runtime control events for this conversation. These are control records, not user messages. Rendered audio positions are estimates: ${JSON.stringify(controlEvents)}`)
 
-    const memorySupplement = composeRetrievedMemoryPrompt(await memoryRetrieval)
+    // The memories that changed today stay in the prompt, so a recap question does not depend on a search
+    // that cannot match its words.
+    if (memory.enabled) {
+      await memory.ready()
+      const recentSupplement = composeRecentMemoryPrompt(memory.entries, Date.now(), persona)
+      if (recentSupplement)
+        supplements.push(recentSupplement)
+    }
+
+    const selected = await memorySelection
+    const retrieved = await memoryRetrieval
+    const seen = new Set<string>()
+    const merged = [...selected, ...retrieved].filter((entry) => {
+      if (seen.has(entry.id))
+        return false
+      seen.add(entry.id)
+      return true
+    })
+    const memorySupplement = composeRetrievedMemoryPrompt(merged)
     if (memorySupplement)
       supplements.push(memorySupplement)
 

@@ -1,3 +1,5 @@
+import type { Conversation } from '@proj-airi/core-agent'
+
 import type { MemoryEntry, MemoryWrite } from '../types/memory'
 
 import { errorMessageFrom } from '@moeru/std'
@@ -6,12 +8,38 @@ import { scoreMemoryCandidates, tokenizeMemoryText } from '@proj-airi/stage-shar
 import { useBroadcastChannel } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { v7 as uuidv7 } from 'uuid'
+import { array, optional, safeParse, strictObject, string } from 'valibot'
 import { computed, ref, watch } from 'vue'
 
+import { useTextGeneration } from '../composables/text-generation'
 import { localMemoryRepo, memoryRepo } from '../database/repos/memory.repo'
 
 const LEGACY_ENTRIES_STORAGE_KEY = 'memory/entries'
 const REMOTE_MIGRATED_KEY = 'memory/remote-migrated'
+const MAX_INDEX_ENTRIES = 60
+const MAX_INDEX_CHARS = 6_000
+const MAX_RECALL_CANDIDATES = 80
+const RECALL_TIMEOUT_MS = 2_000
+const RECALL_SYSTEM_PROMPT = [
+  'You choose long-term memories that help a companion character answer the owner.',
+  'Choose by meaning, not by shared words. A memory helps when it explains the owner message or gives relevant context, even when the words differ.',
+  'Return JSON only: {"ids":["..."]}. Choose at most 6 ids from the list. If no memory helps, return {"ids":[]}.',
+  'Never invent an id. Do not choose the owner profile; it is already in the prompt.',
+].join('\n')
+const recallSchema = strictObject({ ids: optional(array(string())) })
+
+function parseJsonObject(raw: string) {
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start < 0 || end <= start)
+    return undefined
+  try {
+    return JSON.parse(raw.slice(start, end + 1)) as unknown
+  }
+  catch {
+    return undefined
+  }
+}
 
 // NOTICE:
 // v0.13.1 stored entries in localStorage, keyed by a model-chosen name.
@@ -51,10 +79,11 @@ export const useMemoryStore = defineStore('memory', () => {
   const backend = useLocalStorageManualReset<'local' | 'remote'>('memory/backend', 'local')
   const serverUrl = useLocalStorageManualReset<string>('memory/server-url', '/api/memory')
   const serverToken = useLocalStorageManualReset<string>('memory/server-token', '')
-  const formationProvider = useLocalStorageManualReset<string>('memory/formation-provider', '')
-  const formationModel = useLocalStorageManualReset<string>('memory/formation-model', '')
+  const formationProvider = useLocalStorageManualReset<string>('memory/formation/provider', 'deepseek')
+  const formationModel = useLocalStorageManualReset<string>('memory/formation/model', 'deepseek-flash')
   const entries = ref<MemoryEntry[]>([])
   const { data: changed, post } = useBroadcastChannel<string[], string[]>({ name: 'airi:memory' })
+  const { generateText } = useTextGeneration()
 
   function applyBackend() {
     memoryRepo.configure({ mode: backend.value, url: serverUrl.value, token: serverToken.value })
@@ -106,7 +135,10 @@ export const useMemoryStore = defineStore('memory', () => {
    * A run reads it when it starts, from the entries that the window read last.
    */
   function indexFor(personaId: string) {
-    return formatIndex(entries.value.filter(entry => entry.kind !== 'profile'), personaId)
+    const visible = entries.value
+      .filter(entry => entry.kind !== 'profile' && (!entry.persona || entry.persona === personaId))
+      .sort(indexOrder)
+    return formatIndex(visible, personaId)
   }
 
   /** A smaller index for the stable system prompt: pinned entries and the most important recent ones. */
@@ -229,6 +261,73 @@ export const useMemoryStore = defineStore('memory', () => {
     }
   }
 
+  /**
+   * Picks the memories that help this message by meaning, through the memory model. The candidate list is bounded,
+   * so the selection prompt stays small while the main prompt receives only the chosen entries.
+   */
+  async function selectRelevant(query: string, personaId: string, limit = 6, options: { timeoutMs?: number, signal?: AbortSignal } = {}) {
+    if (!enabled.value || !query.trim())
+      return []
+    const providerId = formationProvider.value.trim()
+    const model = formationModel.value.trim()
+    if (!providerId || !model)
+      return []
+
+    const candidates = entries.value
+      .filter(entry => entry.kind !== 'profile' && (!entry.persona || entry.persona === personaId))
+      .slice(0, MAX_RECALL_CANDIDATES)
+    if (candidates.length === 0)
+      return []
+
+    const catalog = candidates.map(entry => `[${entry.id}] (${entry.kind}) ${entry.description}`).join('\n')
+    const conversation: Conversation = {
+      turns: [
+        {
+          id: 'memory-recall-system',
+          type: 'system',
+          authority: 'system',
+          content: [{ type: 'text', text: RECALL_SYSTEM_PROMPT }],
+        },
+        {
+          id: 'memory-recall-user',
+          type: 'user',
+          content: [{ type: 'text', text: `Owner message:\n${query.slice(0, 2_000)}\n\nMemories:\n${catalog}` }],
+        },
+      ],
+    }
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? RECALL_TIMEOUT_MS)
+    const abort = () => controller.abort()
+    options.signal?.addEventListener('abort', abort, { once: true })
+    try {
+      const raw = await generateText({ providerId, model })(conversation, controller.signal)
+      const json = parseJsonObject(raw)
+      const parsed = json ? safeParse(recallSchema, json) : undefined
+      if (!parsed?.success)
+        return []
+      const seen = new Set<string>()
+      return (parsed.output.ids ?? [])
+        .map(id => read(id, personaId))
+        .filter((entry): entry is MemoryEntry => {
+          if (!entry || seen.has(entry.id))
+            return false
+          seen.add(entry.id)
+          return true
+        })
+        .slice(0, limit)
+    }
+    catch (error) {
+      if ((error as { name?: string }).name !== 'AbortError')
+        console.warn('[memory] Semantic recall failed:', errorMessageFrom(error))
+      return []
+    }
+    finally {
+      clearTimeout(timeout)
+      options.signal?.removeEventListener('abort', abort)
+    }
+  }
+
   /** Checks that the configured memory server answers. */
   async function testConnection() {
     try {
@@ -290,16 +389,43 @@ export const useMemoryStore = defineStore('memory', () => {
     forget,
     remove,
     retrieve,
+    selectRelevant,
     testConnection,
     migrateLocalToRemote,
     resetState,
   }
 })
 
+function indexOrder(left: MemoryEntry, right: MemoryEntry) {
+  const pinned = Number(Boolean(right.pinned)) - Number(Boolean(left.pinned))
+  if (pinned !== 0)
+    return pinned
+  const importance = (right.importance ?? 3) - (left.importance ?? 3)
+  if (importance !== 0)
+    return importance
+  return right.updatedAt - left.updatedAt
+}
+
 function formatIndex(entries: readonly MemoryEntry[], personaId: string, includeGeneral = true) {
   const line = (entry: MemoryEntry) => `- ${entry.id}: ${entry.description}`
-  const own = entries.filter(entry => entry.persona === personaId).map(line)
-  const general = includeGeneral ? entries.filter(entry => !entry.persona).map(line) : []
+  let used = 0
+  let count = 0
+  const take = (source: readonly MemoryEntry[]) => {
+    const lines: string[] = []
+    for (const entry of source) {
+      if (count >= MAX_INDEX_ENTRIES)
+        break
+      const text = line(entry)
+      if (used + text.length > MAX_INDEX_CHARS)
+        break
+      lines.push(text)
+      used += text.length
+      count += 1
+    }
+    return lines
+  }
+  const own = take(entries.filter(entry => entry.persona === personaId))
+  const general = includeGeneral ? take(entries.filter(entry => !entry.persona)) : []
   return [
     ...(own.length ? [`Your own:\n${own.join('\n')}`] : []),
     ...(general.length ? [`General:\n${general.join('\n')}`] : []),
