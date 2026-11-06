@@ -213,6 +213,18 @@ export default defineConfig({
     },
 
     server: {
+      proxy: {
+        // Same-origin route to the frp-tunneled FunASR server. The tunnel uses
+        // a self-signed certificate; Node can skip verification while the page
+        // keeps a normal same-origin request. Set the provider base URL to
+        // `/funasr/v1/` to use this route during development.
+        '/funasr': {
+          target: 'https://airi.example',
+          changeOrigin: true,
+          secure: false,
+          rewrite: path => path.replace(/^\/funasr/, ''),
+        },
+      },
       fs: {
         // To mute errors like:
         //   The request id ".../node_modules/@fontsource/sniglet/files/sniglet-latin-400-normal.woff" is outside of Vite serving allow list.

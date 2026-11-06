@@ -8,7 +8,7 @@ import process from 'node:process'
 
 import { readFileSync } from 'node:fs'
 
-import base, { breezeTtsProxy, liveDanmakuProxy, memoryProxy, ollamaProxy } from './vite.config'
+import base, { breezeTtsProxy, funasrProxy, liveDanmakuProxy, memoryProxy, ollamaProxy } from './vite.config'
 
 const keyPath = process.env.AIRI_TLS_KEY ?? 'D:/AI/内网穿透/certs/airi-key.pem'
 const certPath = process.env.AIRI_TLS_CERT ?? 'D:/AI/内网穿透/certs/airi-cert.pem'
@@ -50,7 +50,7 @@ export default {
     // the seeded `/breeze-tts/` base URL resolves here exactly as it does in
     // the dev server. `/ollama` needs the same treatment: the phone cannot
     // reach the loopback Ollama port on its own.
-    proxy: { ...base.preview?.proxy, ...breezeTtsProxy, ...ollamaProxy, ...memoryProxy, ...liveDanmakuProxy },
+    proxy: { ...base.preview?.proxy, ...breezeTtsProxy, ...ollamaProxy, ...memoryProxy, ...liveDanmakuProxy, ...funasrProxy },
     host: '127.0.0.1',
     port: Number(process.env.AIRI_PREVIEW_PORT ?? 4174),
     strictPort: true,

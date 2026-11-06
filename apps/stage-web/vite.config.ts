@@ -149,6 +149,23 @@ export const liveDanmakuProxy: Record<string, ProxyOptions> = {
   },
 }
 
+/**
+ * Forwards the frp-tunneled FunASR server through whichever origin serves the
+ * app. The tunnel uses a self-signed certificate for airi.example, so a
+ * browser that has not trusted it cannot call the HTTPS endpoint directly.
+ * This proxy runs in Node and can skip verification while the page keeps a
+ * same-origin request. Setting the provider base URL to `/funasr/v1/` selects
+ * this route; the public URL remains the default for hosts without a proxy.
+ */
+export const funasrProxy: Record<string, ProxyOptions> = {
+  '/funasr': {
+    target: 'https://airi.example',
+    changeOrigin: true,
+    secure: false,
+    rewrite: path => path.replace(/^\/funasr/, ''),
+  },
+}
+
 export default defineConfig({
   optimizeDeps: {
     exclude: [
@@ -188,7 +205,7 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: { ...breezeTtsProxy, ...ollamaProxy, ...strataProxy, ...memoryProxy, ...liveDanmakuProxy },
+    proxy: { ...breezeTtsProxy, ...ollamaProxy, ...strataProxy, ...memoryProxy, ...liveDanmakuProxy, ...funasrProxy },
     fs: {
       // To mute errors like:
       //   The request id ".../node_modules/@fontsource/sniglet/files/sniglet-latin-400-normal.woff" is outside of Vite serving allow list.

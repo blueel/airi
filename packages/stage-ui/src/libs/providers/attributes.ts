@@ -66,6 +66,7 @@ const providerAttributesById = {
   'elevenlabs': paidCloud,
   'featherless-ai': paidCloud,
   'fireworks-ai': paidCloud,
+  'funasr-transcription': freeLocal,
   'google-generative-ai': paidCloud,
   'groq': paidCloud,
   'index-tts-vllm': freeLocal,
