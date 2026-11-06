@@ -1,5 +1,9 @@
 package ai.moeru.airi_pocket
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,6 +11,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Outline
@@ -29,11 +34,13 @@ import android.util.DisplayMetrics
 import android.util.Log
 import android.view.Display
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.core.app.NotificationCompat
@@ -76,6 +83,16 @@ class FloatingBubbleService : Service() {
         private const val NOTIFICATION_ID = 4102
         private const val BUBBLE_SIZE_DP = 58
         private const val BUBBLE_MARGIN_DP = 10
+        private const val BUBBLE_SNAP_THRESHOLD_DP = 28
+        private const val BUBBLE_SNAP_DURATION_MS = 180L
+        private const val BUBBLE_FADE_DURATION_MS = 140L
+        private const val BUBBLE_TAP_FLASH_DURATION_MS = 200L
+        private const val BUBBLE_TAP_HIDE_DELAY_MS = 120L
+        private const val BUBBLE_ALPHA_NORMAL = 0.96f
+        private const val BUBBLE_ALPHA_SNAPPED = 0.6f
+        private const val EDGE_NONE = 0
+        private const val EDGE_LEFT = 1
+        private const val EDGE_RIGHT = 2
         private const val BUBBLE_SCREEN_FRACTION = 0.62f
         private const val MAX_CAPTURE_SIDE = 1280
         private const val CAPTURE_TIMEOUT_MS = 2_500L
@@ -92,6 +109,10 @@ class FloatingBubbleService : Service() {
     private var windowManager: WindowManager? = null
     private var bubbleView: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
+    private var bubbleFlashView: View? = null
+    private var snapAnimator: ValueAnimator? = null
+    private var alphaAnimator: ObjectAnimator? = null
+    private var snappedEdge = EDGE_NONE
     private var mediaProjection: MediaProjection? = null
     private var projectionCallback: MediaProjection.Callback? = null
     private var virtualDisplay: VirtualDisplay? = null
@@ -138,11 +159,34 @@ class FloatingBubbleService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        snapAnimator?.cancel()
+        snapAnimator = null
+        alphaAnimator?.cancel()
+        alphaAnimator = null
         removeBubble()
         stopProjection()
         captureExecutor.shutdownNow()
         captureThread.quitSafely()
         super.onDestroy()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+
+        val view = bubbleView ?: return
+        val params = bubbleParams ?: return
+        val metrics = screenMetrics()
+        val margin = dp(BUBBLE_MARGIN_DP)
+        val maxX = max(margin, metrics.widthPixels - view.width - margin)
+        val maxY = max(margin, metrics.heightPixels - view.height - margin)
+
+        params.x = when (snappedEdge) {
+            EDGE_LEFT -> margin
+            EDGE_RIGHT -> maxX
+            else -> params.x.coerceIn(margin, maxX)
+        }
+        params.y = params.y.coerceIn(margin, maxY)
+        updateBubbleLayout(view, params)
     }
 
     private fun createNotificationChannel() {
@@ -376,18 +420,28 @@ class FloatingBubbleService : Service() {
         }
         catch (error: Exception) {
             Log.e(TAG, "Could not add the floating bubble", error)
+            bubbleFlashView = null
             stopSelf()
             return
         }
 
         bubbleView = bubble
         bubbleParams = params
+        // The bubble starts on the right edge, so it starts in the snapped state.
+        bubble.alpha = BUBBLE_ALPHA_SNAPPED
+        snappedEdge = EDGE_RIGHT
     }
 
     private fun removeBubble() {
         val bubble = bubbleView ?: return
+        snapAnimator?.cancel()
+        snapAnimator = null
+        alphaAnimator?.cancel()
+        alphaAnimator = null
         bubbleView = null
         bubbleParams = null
+        bubbleFlashView = null
+        snappedEdge = EDGE_NONE
         try {
             windowManager?.removeView(bubble)
         }
@@ -409,7 +463,6 @@ class FloatingBubbleService : Service() {
         val container = FrameLayout(this).apply {
             background = ring
             elevation = dp(6).toFloat()
-            alpha = 0.96f
             contentDescription = getString(R.string.floating_bubble_notification_title)
         }
 
@@ -437,7 +490,111 @@ class FloatingBubbleService : Service() {
 
         val inset = dp(7)
         container.addView(iconFrame, FrameLayout.LayoutParams(size - inset * 2, size - inset * 2, Gravity.CENTER))
+
+        // A short white flash confirms the tap before the bubble hides for the capture.
+        val flash = View(this).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.WHITE)
+            }
+            alpha = 0f
+        }
+        iconFrame.addView(flash, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT,
+        ))
+        bubbleFlashView = flash
+
         return container
+    }
+
+    /** Moves the bubble to the nearest side when the owner drops it close to that side. */
+    private fun settleBubble(view: View, params: WindowManager.LayoutParams, animate: Boolean) {
+        val metrics = screenMetrics()
+        val margin = dp(BUBBLE_MARGIN_DP)
+        val threshold = dp(BUBBLE_SNAP_THRESHOLD_DP)
+        val maxX = max(margin, metrics.widthPixels - view.width - margin)
+        val leftDistance = params.x
+        val rightDistance = metrics.widthPixels - view.width - params.x
+
+        when {
+            leftDistance <= threshold -> {
+                snappedEdge = EDGE_LEFT
+                moveBubble(view, params, margin, animate)
+            }
+
+            rightDistance <= threshold -> {
+                snappedEdge = EDGE_RIGHT
+                moveBubble(view, params, maxX, animate)
+            }
+
+            else -> {
+                snappedEdge = EDGE_NONE
+                fadeBubble(view, BUBBLE_ALPHA_NORMAL)
+            }
+        }
+    }
+
+    private fun moveBubble(view: View, params: WindowManager.LayoutParams, targetX: Int, animate: Boolean) {
+        if (params.x == targetX) {
+            fadeBubble(view, BUBBLE_ALPHA_SNAPPED)
+            return
+        }
+
+        if (!animate) {
+            params.x = targetX
+            updateBubbleLayout(view, params)
+            fadeBubble(view, BUBBLE_ALPHA_SNAPPED)
+            return
+        }
+
+        snapAnimator?.cancel()
+        val animator = ValueAnimator.ofInt(params.x, targetX).apply {
+            duration = BUBBLE_SNAP_DURATION_MS
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { animation ->
+                params.x = animation.animatedValue as Int
+                updateBubbleLayout(view, params)
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (snapAnimator === this@apply) {
+                        snapAnimator = null
+                        fadeBubble(view, BUBBLE_ALPHA_SNAPPED)
+                    }
+                }
+            })
+        }
+        snapAnimator = animator
+        animator.start()
+    }
+
+    private fun fadeBubble(view: View, targetAlpha: Float) {
+        if (abs(view.alpha - targetAlpha) < 0.01f)
+            return
+        alphaAnimator?.cancel()
+        alphaAnimator = ObjectAnimator.ofFloat(view, View.ALPHA, view.alpha, targetAlpha).apply {
+            duration = BUBBLE_FADE_DURATION_MS
+            start()
+        }
+    }
+
+    private fun updateBubbleLayout(view: View, params: WindowManager.LayoutParams) {
+        try {
+            windowManager?.updateViewLayout(view, params)
+        }
+        catch (error: Exception) {
+            Log.w(TAG, "Could not move the floating bubble", error)
+        }
+    }
+
+    private fun playTapFeedback(view: View) {
+        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        bubbleFlashView?.let { flash ->
+            flash.animate().cancel()
+            flash.alpha = 0.45f
+            flash.animate().alpha(0f).setDuration(BUBBLE_TAP_FLASH_DURATION_MS).start()
+        }
     }
 
     private inner class BubbleDragListener(
@@ -458,6 +615,10 @@ class FloatingBubbleService : Service() {
                     startX = params.x
                     startY = params.y
                     dragging = false
+                    snapAnimator?.cancel()
+                    snapAnimator = null
+                    // The snapped bubble is translucent, so it becomes opaque while the owner holds it.
+                    fadeBubble(view, BUBBLE_ALPHA_NORMAL)
                     view.animate().scaleX(0.92f).scaleY(0.92f).setDuration(80).start()
                 }
 
@@ -472,22 +633,21 @@ class FloatingBubbleService : Service() {
                     val metrics = screenMetrics()
                     params.x = (startX + deltaX).toInt().coerceIn(0, max(0, metrics.widthPixels - view.width))
                     params.y = (startY + deltaY).toInt().coerceIn(0, max(0, metrics.heightPixels - view.height))
-                    try {
-                        windowManager?.updateViewLayout(view, params)
-                    }
-                    catch (error: Exception) {
-                        Log.w(TAG, "Could not move the floating bubble", error)
-                    }
+                    updateBubbleLayout(view, params)
                 }
 
                 MotionEvent.ACTION_UP -> {
                     view.animate().scaleX(1f).scaleY(1f).setDuration(80).start()
+                    if (!dragging)
+                        playTapFeedback(view)
+                    settleBubble(view, params, animate = dragging)
                     if (!dragging)
                         requestCapture()
                 }
 
                 MotionEvent.ACTION_CANCEL -> {
                     view.animate().scaleX(1f).scaleY(1f).setDuration(80).start()
+                    settleBubble(view, params, animate = false)
                 }
             }
             return true
@@ -499,29 +659,42 @@ class FloatingBubbleService : Service() {
             return
 
         val bubble = bubbleView
-        // Hiding the bubble changes the screen, so the next frame holds no overlay.
-        val requestedAt = SystemClock.elapsedRealtime()
-        bubble?.visibility = View.INVISIBLE
+        // Let the tap feedback play before the bubble leaves the frame.
         mainHandler.postDelayed({
-            captureExecutor.execute {
-                try {
-                    val dataUrl = captureScreen(requestedAt)
-                    if (dataUrl != null)
-                        deliverCapture(dataUrl)
-                    else
-                        Log.w(TAG, "The screen capture returned no frame")
+            if (!isRunning) {
+                capturing.set(false)
+                return@postDelayed
+            }
+
+            // Hiding the bubble changes the screen, so the next frame holds no overlay.
+            val requestedAt = SystemClock.elapsedRealtime()
+            bubble?.visibility = View.INVISIBLE
+            mainHandler.postDelayed({
+                if (!isRunning) {
+                    capturing.set(false)
+                    return@postDelayed
                 }
-                catch (error: Exception) {
-                    Log.e(TAG, "The screen capture failed", error)
-                }
-                finally {
-                    mainHandler.post {
-                        bubble?.visibility = View.VISIBLE
-                        capturing.set(false)
+
+                captureExecutor.execute {
+                    try {
+                        val dataUrl = captureScreen(requestedAt)
+                        if (dataUrl != null)
+                            deliverCapture(dataUrl)
+                        else
+                            Log.w(TAG, "The screen capture returned no frame")
+                    }
+                    catch (error: Exception) {
+                        Log.e(TAG, "The screen capture failed", error)
+                    }
+                    finally {
+                        mainHandler.post {
+                            bubble?.visibility = View.VISIBLE
+                            capturing.set(false)
+                        }
                     }
                 }
-            }
-        }, BUBBLE_HIDE_DELAY_MS)
+            }, BUBBLE_HIDE_DELAY_MS)
+        }, BUBBLE_TAP_HIDE_DELAY_MS)
     }
 
     private fun captureScreen(requestedAt: Long): String? {
