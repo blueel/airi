@@ -1205,9 +1205,7 @@ pages:
         keywords_summary: 'Code words: {words}'
         tabs:
           conversation: In conversation
-          auto_run: Auto-run
           conversation_description: Recipes for chatting. They act only when you send a message.
-          auto_run_description: Recipes that start on their own when a cue comes. Each run costs a model call.
         background:
           label: Run in the background
           description: For tasks that take time, such as research. It works in the background and brings the result back.

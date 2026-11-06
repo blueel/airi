@@ -1142,9 +1142,7 @@ pages:
         keywords_summary: '暗号：{words}'
         tabs:
           conversation: 对话中
-          auto_run: 自动运行
           conversation_description: 聊天时用的配方，你发消息时才会用上。
-          auto_run_description: 契机一到就自己开始，不用你发消息。每次运行都会请求一次模型。
         background:
           label: 在后台运行
           description: 适合查资料这类要花时间的事。在后台做完，再把结果带回对话。
