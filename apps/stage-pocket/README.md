@@ -28,6 +28,15 @@ Watch along keeps one screen look per interval on the bubble's MediaProjection s
 The vision model describes the frame, and the character comments in voice when a reaction fits.
 The mode needs the screen bubble and a configured vision provider. See `docs/ai/adr/2026-11-06-watch-along.md`.
 
+## Background Replies
+
+Android freezes a hidden WebView page after about a minute, so the page cannot answer or speak there.
+The screen bubble service answers a wake word or hold-to-talk turn itself: it sends the prepared chat and speech
+requests, plays the audio, and adds the finished turn to the chat history when the page runs again.
+The switch is in the screen bubble settings and is on by default.
+The background turn uses the character prompt and recent history, but no tools.
+See `docs/ai/adr/2026-11-09-background-reply.md`.
+
 ## WebSocket Bridge
 
 Stage Pocket adds a host-backed WebSocket bridge for `@proj-airi/server-sdk`.

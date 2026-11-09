@@ -2613,6 +2613,9 @@ pages:
         errors:
           status: Could not read the wake word status.
           sync: Could not update the wake word setting.
+      background-voice:
+        title: Reply from the background
+        description: The bubble answers and speaks while the app is hidden. It uses the character's chat and speech providers.
     mika:
       title: Phone Control
       description: Let AIRI ask Mika on this phone to operate other apps.

@@ -150,6 +150,16 @@ class FloatingBubbleService : Service() {
     var wakeWordErrorResId: Int? = null
         private set
 
+    /** Answers and speaks a wake word or hold-to-talk turn while the WebView is frozen in the background. */
+    private val backgroundReplyDelegate = lazy {
+        BackgroundReplyEngine(
+            context = this,
+            onSpeaking = { speaking -> setWakeWordSpeaking(speaking) },
+            onCompleted = { turn -> BackgroundReplySettings.appendTurn(this, turn) },
+        )
+    }
+    private val backgroundReply: BackgroundReplyEngine by backgroundReplyDelegate
+
     private var windowManager: WindowManager? = null
     private var bubbleView: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
@@ -235,6 +245,8 @@ class FloatingBubbleService : Service() {
         wakeWordListener = null
         wakeWordState = WakeWordListener.State.STOPPED
         stopWatching()
+        if (backgroundReplyDelegate.isInitialized())
+            backgroundReplyDelegate.value.release()
         instance = null
         snapAnimator?.cancel()
         snapAnimator = null
@@ -305,7 +317,8 @@ class FloatingBubbleService : Service() {
 
     /** The projection type is always present. The microphone type is added while the wake word listens. */
     private fun foregroundServiceTypes(): Int {
-        var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+        // Playing a background reply uses the media playback type, so the service stays a media service.
+        var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
             && wakeWordConfig.usable
             && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -928,6 +941,10 @@ class FloatingBubbleService : Service() {
 
     private fun deliverVoice(text: String) {
         wakeWordListener?.pauseForReply()
+        // A hidden WebView cannot run, so the service answers and speaks this turn itself.
+        if (!MainActivity.isVisible && backgroundReply.start(text))
+            return
+
         val plugin = FloatingBubblePlugin.instance
         if (plugin == null) {
             FloatingBubblePlugin.holdTranscript(this, text, openActivity = true)

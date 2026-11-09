@@ -1679,6 +1679,29 @@ export const useChatStore = defineStore('chat', () => {
     return runtime.getPendingQueuedSendSnapshot()
   }
 
+  /**
+   * The system prompt and recent text of a session, for a turn that a native host runs outside this renderer.
+   *
+   * Use when:
+   * - A host answers a turn while this window cannot run, for example an Android background service.
+   *
+   * Expects:
+   * - The session exists. The host appends the new owner text and returns the finished turn.
+   *
+   * Returns:
+   * - The composed system prompt and up to 16 recent text turns.
+   */
+  function backgroundTurnContext(sessionId: string) {
+    const history = chatSession.getSessionMessages(sessionId)
+      .filter(message => message.role === 'user' || message.role === 'assistant')
+      .flatMap((message) => {
+        const content = extractMessageText(message).trim()
+        return content ? [{ role: message.role as 'user' | 'assistant', content }] : []
+      })
+      .slice(-16)
+    return { systemPrompt: sessionSystemPrompt(sessionId), history }
+  }
+
   return {
     sending,
     activeTurns,
@@ -1706,6 +1729,7 @@ export const useChatStore = defineStore('chat', () => {
     receiveInterruption,
     cancelPendingSends,
     getPendingQueuedSendSnapshot,
+    backgroundTurnContext,
     openTurnSpan,
 
     clearHooks: runtime.hooks.clearHooks,

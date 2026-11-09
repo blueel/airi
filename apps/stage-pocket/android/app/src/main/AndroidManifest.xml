@@ -41,7 +41,7 @@
         <service
             android:name=".FloatingBubbleService"
             android:exported="false"
-            android:foregroundServiceType="mediaProjection|microphone"
+            android:foregroundServiceType="mediaProjection|microphone|mediaPlayback"
             android:stopWithTask="true" />
 
         <service
@@ -76,5 +76,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

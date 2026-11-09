@@ -2406,6 +2406,9 @@ pages:
         errors:
           status: 无法读取唤醒词状态。
           sync: 无法更新唤醒词设置。
+      background-voice:
+        title: 后台回复
+        description: 应用退到后台后，由悬浮球直接回答并朗读。使用当前角色的聊天和语音服务。
     mika:
       title: 手机操控
       description: 让 AIRI 把任务交给手机上的 Mika 操作其他应用。

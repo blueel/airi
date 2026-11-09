@@ -185,6 +185,41 @@ class FloatingBubblePlugin : Plugin() {
         call.resolve()
     }
 
+    /**
+     * Stores the chat and speech requests that the service uses for a turn while the WebView cannot run.
+     *
+     * The WebView builds them with the same helpers as a normal turn, so provider URLs, headers, and options stay
+     * in one place. It sends `enabled: false` when background replies are off or not configured.
+     */
+    @PluginMethod
+    fun syncBackgroundReply(call: PluginCall) {
+        val config = call.getObject("config")
+        if (config == null) {
+            call.reject(context.getString(R.string.floating_bubble_background_reply_missing))
+            return
+        }
+        BackgroundReplySettings.writeConfig(context, config.toString())
+        call.resolve()
+    }
+
+    /** Returns the turns that the service answered while the WebView could not run, and clears them. */
+    @PluginMethod
+    fun consumeBackgroundTurns(call: PluginCall) {
+        val turns = JSArray()
+        BackgroundReplySettings.takeTurns(context).forEach { turn ->
+            turns.put(
+                JSObject()
+                    .put("id", turn.id)
+                    .put("sessionId", turn.sessionId)
+                    .put("userText", turn.userText)
+                    .put("assistantText", turn.assistantText)
+                    .put("createdAt", turn.createdAt)
+                    .put("completedAt", turn.completedAt),
+            )
+        }
+        call.resolve(JSObject().put("turns", turns))
+    }
+
     /** Starts the companion frame loop on the bubble's MediaProjection session. */
     @PluginMethod
     fun startWatching(call: PluginCall) {

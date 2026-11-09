@@ -21,10 +21,28 @@ import ai.moeru.airi_pocket.websocket.createHostWebSocketClient
 class MainActivity : BridgeActivity() {
     companion object {
         internal var webSocketSessionFactoryOverrideForTesting: ((String, (HostWebSocketEvent) -> Unit) -> HostWebSocketSession)? = null
+
+        /**
+         * Whether the app page is in front. The background reply engine uses it to decide who answers a transcript:
+         * the WebView while this is true, and this process while it is false.
+         */
+        @Volatile
+        var isVisible = false
+            private set
     }
 
     private val webSocketBridgeClient = createHostWebSocketClient()
     private var webSocketBridge: HostWebSocketBridge? = null
+
+    override fun onResume() {
+        super.onResume()
+        isVisible = true
+    }
+
+    override fun onPause() {
+        isVisible = false
+        super.onPause()
+    }
 
     override fun load() {
         registerPlugin(AppUpdaterPlugin::class.java)

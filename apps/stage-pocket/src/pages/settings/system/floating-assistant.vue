@@ -13,6 +13,7 @@ import { useRouter } from 'vue-router'
 
 import { FloatingAssistant, isFloatingAssistantSupported } from '../../../modules/floating-assistant'
 import { MicrophonePermission } from '../../../modules/microphone-permission'
+import { useBackgroundReplyStore } from '../../../stores/background-reply'
 import { useFloatingAssistantWakeWordStore } from '../../../stores/floating-assistant-wake-word'
 
 const { t } = useI18n()
@@ -22,6 +23,7 @@ const consciousness = useConsciousnessStore()
 const vision = useVisionStore()
 const speech = useSpeechStore()
 const wakeWord = useFloatingAssistantWakeWordStore()
+const backgroundReply = useBackgroundReplyStore()
 
 const status = ref<FloatingAssistantStatus | null>(null)
 const busy = ref(false)
@@ -255,6 +257,18 @@ onUnmounted(() => {
         variant="secondary"
         :label="t('settings.pages.system.floating-assistant.wake-word.open-settings')"
         @click="openSettings('/settings/modules/hearing/wake-words')"
+      />
+    </div>
+
+    <div
+      v-if="supported"
+      :class="['flex flex-col gap-3 rounded-2xl p-4', 'bg-neutral-100/70 dark:bg-neutral-800/60']"
+    >
+      <FieldCheckbox
+        :model-value="backgroundReply.enabled"
+        :label="t('settings.pages.system.floating-assistant.background-voice.title')"
+        :description="t('settings.pages.system.floating-assistant.background-voice.description')"
+        @update:model-value="value => backgroundReply.enabled = value"
       />
     </div>
 

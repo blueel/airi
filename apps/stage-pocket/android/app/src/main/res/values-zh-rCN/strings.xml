@@ -19,6 +19,8 @@
     <string name="floating_bubble_wake_word_unavailable">这台手机没有可用的语音识别服务，无法使用唤醒词。</string>
     <string name="floating_bubble_wake_word_failed">唤醒词监听已停止，请重试。</string>
     <string name="floating_bubble_watch_unavailable">请先打开屏幕悬浮球，AIRI 才能看到屏幕。</string>
+    <string name="floating_bubble_background_reply_missing">后台回复配置缺失。</string>
+    <string name="floating_bubble_background_reply_failed">后台回答失败，回到应用后会继续回答。</string>
     <string name="install_accessibility_label">AIRI 自动安装</string>
     <string name="install_accessibility_description">在系统安装界面自动点击「安装」，用于 AIRI 自己的更新。Android 不允许普通应用完全静默安装。</string>
 </resources>
