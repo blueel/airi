@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIRI 记忆库 · 可视化查询</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">記</span>
+      <div>
+        <h1>AIRI 记忆库</h1>
+        <p class="brand-sub">memory-server · SQLite 只读查询</p>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <span class="chip" id="db-path" title="">…</span>
+      <span class="chip chip-quiet" id="db-readonly">只读</span>
+      <button class="btn btn-ghost" id="btn-refresh" title="重新读取数据库">刷新</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="stats" id="stats" aria-label="概览">
+      <div class="stat-card" data-tone="total">
+        <span class="stat-label">生效中</span>
+        <strong class="stat-value" id="stat-active">–</strong>
+        <span class="stat-hint" id="stat-range">–</span>
+      </div>
+      <div class="stat-card" data-tone="pinned">
+        <span class="stat-label">置顶</span>
+        <strong class="stat-value" id="stat-pinned">–</strong>
+        <span class="stat-hint">始终进入提示词</span>
+      </div>
+      <div class="stat-card" data-tone="general">
+        <span class="stat-label">通用记忆</span>
+        <strong class="stat-value" id="stat-general">–</strong>
+        <span class="stat-hint">无 persona，所有角色共享</span>
+      </div>
+      <div class="stat-card" data-tone="deleted">
+        <span class="stat-label">已删除</span>
+        <strong class="stat-value" id="stat-deleted">–</strong>
+        <span class="stat-hint">软删除的墓碑记录</span>
+      </div>
+      <div class="stat-card" data-tone="persona">
+        <span class="stat-label">角色数</span>
+        <strong class="stat-value" id="stat-personas">–</strong>
+        <span class="stat-hint" id="stat-last">–</span>
+      </div>
+    </section>
+
+    <section class="charts">
+      <article class="panel">
+        <header class="panel-head">
+          <h2>近 30 天活跃度</h2>
+          <span class="panel-note">按最后更新时间统计</span>
+        </header>
+        <div class="chart" id="chart-daily"></div>
+      </article>
+      <article class="panel">
+        <header class="panel-head">
+          <h2>类型分布</h2>
+          <span class="panel-note">profile / fact / episode</span>
+        </header>
+        <div class="chart" id="chart-kinds"></div>
+      </article>
+      <article class="panel">
+        <header class="panel-head">
+          <h2>角色分布</h2>
+          <span class="panel-note">按条目数</span>
+        </header>
+        <div class="chart" id="chart-personas"></div>
+      </article>
+    </section>
+
+    <section class="panel table-panel">
+      <div class="filters">
+        <div class="search">
+          <input id="search" type="search" placeholder="搜索描述或正文，按 / 聚焦" autocomplete="off" />
+        </div>
+        <select id="filter-persona" aria-label="角色">
+          <option value="__all__">全部角色</option>
+        </select>
+        <select id="filter-kind" aria-label="类型">
+          <option value="">全部类型</option>
+          <option value="profile">profile</option>
+          <option value="fact">fact</option>
+          <option value="episode">episode</option>
+        </select>
+        <select id="filter-range" aria-label="时间范围">
+          <option value="">全部时间</option>
+          <option value="7">近 7 天</option>
+          <option value="30">近 30 天</option>
+          <option value="90">近 90 天</option>
+        </select>
+        <select id="filter-sort" aria-label="排序">
+          <option value="default">默认：置顶 + 重要度</option>
+          <option value="updated">最近更新</option>
+          <option value="importance">重要度</option>
+          <option value="used">使用次数</option>
+          <option value="description">描述 A→Z</option>
+        </select>
+        <label class="toggle">
+          <input type="checkbox" id="filter-pinned" />
+          <span>仅置顶</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="filter-deleted" />
+          <span>含已删除</span>
+        </label>
+        <div class="filters-end">
+          <button class="btn btn-ghost" id="btn-export-json">导出 JSON</button>
+          <button class="btn btn-ghost" id="btn-export-csv">导出 CSV</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="grid">
+          <thead>
+            <tr>
+              <th class="col-time">更新时间</th>
+              <th class="col-desc">描述</th>
+              <th class="col-persona">角色</th>
+              <th class="col-kind">类型</th>
+              <th class="col-imp">重要度</th>
+              <th class="col-use">使用</th>
+              <th class="col-source">来源</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty" hidden>
+          <p>没有匹配的记忆</p>
+          <span>换个关键词，或清空筛选条件</span>
+        </div>
+      </div>
+
+      <footer class="pager">
+        <span class="pager-info" id="pager-info">–</span>
+        <div class="pager-actions">
+          <select id="page-size" aria-label="每页条数">
+            <option value="20">20 / 页</option>
+            <option value="50" selected>50 / 页</option>
+            <option value="100">100 / 页</option>
+            <option value="200">200 / 页</option>
+          </select>
+          <button class="btn btn-ghost" id="btn-prev">上一页</button>
+          <button class="btn btn-ghost" id="btn-next">下一页</button>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <div class="drawer-scrim" id="scrim" hidden></div>
+  <aside class="drawer" id="drawer" hidden aria-label="记忆详情">
+    <header class="drawer-head">
+      <div>
+        <span class="kind-badge" id="drawer-kind">–</span>
+        <h2 id="drawer-title">–</h2>
+      </div>
+      <button class="btn btn-icon" id="drawer-close" title="关闭（Esc）">✕</button>
+    </header>
+    <div class="drawer-body">
+      <div class="drawer-block">
+        <h3>正文</h3>
+        <pre class="body-text" id="drawer-body">–</pre>
+        <button class="btn btn-ghost btn-small" id="btn-copy">复制正文</button>
+      </div>
+      <div class="drawer-block">
+        <h3>元数据</h3>
+        <dl class="meta" id="drawer-meta"></dl>
+      </div>
+      <div class="drawer-block" id="drawer-session-block" hidden>
+        <h3>来源会话</h3>
+        <code id="drawer-session">–</code>
+      </div>
+      <div class="drawer-block">
+        <h3>ID</h3>
+        <code id="drawer-id">–</code>
+      </div>
+    </div>
+  </aside>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
