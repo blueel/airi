@@ -16,23 +16,23 @@ async function parseConfig() {
 }
 
 describe('funasr-transcription provider', () => {
-  it('defaults to the tunneled server', async () => {
+  it('defaults to the same-origin proxy path', async () => {
     const config = await parseConfig()
 
-    expect(config.baseUrl).toBe('https://airi.example/v1/')
+    expect(config.baseUrl).toBe('/funasr/v1/')
     expect(config.apiKey).toBe('')
   })
 
   it('normalizes an absolute base URL', () => {
-    expect(normalizeBaseUrl('https://example.test:9250/v1')).toBe('https://example.test:9250/v1/')
-    expect(normalizeBaseUrl('https://example.test:9250/v1/')).toBe('https://example.test:9250/v1/')
-    expect(normalizeBaseUrl('')).toBe('https://airi.example/v1/')
+    expect(normalizeBaseUrl('https://example.test/v1')).toBe('https://example.test/v1/')
+    expect(normalizeBaseUrl('https://example.test/v1/')).toBe('https://example.test/v1/')
+    expect(normalizeBaseUrl('')).toBe('/funasr/v1/')
   })
 
   it('resolves a same-origin proxy path against the page origin', () => {
-    vi.stubGlobal('location', { origin: 'https://airi.example:9200' })
+    vi.stubGlobal('location', { origin: 'https://airi.example' })
 
-    expect(normalizeBaseUrl('/funasr/v1/')).toBe('https://airi.example:9200/funasr/v1/')
+    expect(normalizeBaseUrl('/funasr/v1/')).toBe('https://airi.example/funasr/v1/')
   })
 
   it('lists the two FunASR models', async () => {

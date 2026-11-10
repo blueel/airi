@@ -60,6 +60,8 @@ const buildTime = resolveBuildTime()
 /** The renderer chunk that holds the `unplugin-info` modules. Its file name has no hash. */
 const buildInfoChunkName = 'build-info'
 
+const funasrOrigin = env.AIRI_FUNASR_ORIGIN?.trim()
+
 export default defineConfig({
   main: {
     define: {
@@ -213,18 +215,16 @@ export default defineConfig({
     },
 
     server: {
-      proxy: {
-        // Same-origin route to the frp-tunneled FunASR server. The tunnel uses
-        // a self-signed certificate; Node can skip verification while the page
-        // keeps a normal same-origin request. Set the provider base URL to
-        // `/funasr/v1/` to use this route during development.
-        '/funasr': {
-          target: 'https://airi.example',
-          changeOrigin: true,
-          secure: false,
-          rewrite: path => path.replace(/^\/funasr/, ''),
-        },
-      },
+      proxy: (funasrOrigin
+        ? {
+            '/funasr': {
+              target: funasrOrigin,
+              changeOrigin: true,
+              secure: false,
+              rewrite: (path: string) => path.replace(/^\/funasr/, ''),
+            },
+          }
+        : {}),
       fs: {
         // To mute errors like:
         //   The request id ".../node_modules/@fontsource/sniglet/files/sniglet-latin-400-normal.woff" is outside of Vite serving allow list.

@@ -6,13 +6,12 @@ import { z } from 'zod'
 import { defineProvider } from '../../registry'
 
 // NOTICE:
-// Default points to a frp-tunneled breeze-server instead of loopback: the app
-// runs on phones where 127.0.0.1 is the phone itself, and the owner's PC
-// exposes the server through frp (VPS airi.example -> PC 127.0.0.1:9310).
-// The server has no auth and allows any origin, so plain HTTP works from WebView.
+// The default is a same-origin proxy path. A phone cannot reach a loopback
+// server, and this repository does not ship a public host. A build that
+// serves Breeze-TTS from another origin sets `VITE_AIRI_BREEZE_TTS_URL`.
 // Removal condition: when the app ships a first-run flow that asks for the
 // local server address, restore 'http://127.0.0.1:9310/'.
-const DEFAULT_BASE_URL = 'http://airi.example/'
+const DEFAULT_BASE_URL = import.meta.env.VITE_AIRI_BREEZE_TTS_URL?.trim() || '/breeze-tts/'
 const DEFAULT_MODEL = 'breeze-tts-2'
 const BUSY_RETRIES = 30
 const BUSY_RETRY_DELAY_MS = 500

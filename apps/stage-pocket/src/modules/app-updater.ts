@@ -93,8 +93,8 @@ export interface AppUpdaterPlugin {
 
 export const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater')
 
-/** Native APK updates are served by the owner's frp tunnel. */
-export const DEFAULT_UPDATE_MANIFEST_URL = 'http://airi.example/latest.json'
+/** The build supplies the manifest URL. Without it, automatic checks stay off. */
+export const DEFAULT_UPDATE_MANIFEST_URL = import.meta.env.VITE_AIRI_UPDATE_MANIFEST_URL?.trim() || ''
 export const UPDATE_MANIFEST_URL_KEY = 'settings/system/update-manifest-url'
 export const AUTO_INSTALL_KEY = 'settings/system/auto-install'
 export const AUTO_LIVE_UPDATE_KEY = 'settings/system/auto-live-update'

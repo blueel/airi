@@ -4,12 +4,12 @@ import { z } from 'zod'
 import { defineProvider } from '../../registry'
 
 /**
- * Default points at the frp-tunneled FunASR server. It serves the OpenAI
- * `/v1/audio/transcriptions` contract over HTTPS and requires a bearer token
- * (the `access_token.txt` next to the server). A same-origin proxy path such
- * as `/funasr/v1/` works too, for hosts whose dev server forwards that path.
+ * Default is a same-origin proxy path. The server serves the OpenAI
+ * `/v1/audio/transcriptions` contract and can require a bearer token (the
+ * `access_token.txt` next to the server). A build that calls the server
+ * directly sets `VITE_AIRI_FUNASR_URL`.
  */
-const DEFAULT_BASE_URL = 'https://airi.example/v1/'
+const DEFAULT_BASE_URL = import.meta.env.VITE_AIRI_FUNASR_URL?.trim() || '/funasr/v1/'
 
 const funAsrConfigSchema = z.object({
   apiKey: z.string('API Key').default(''),

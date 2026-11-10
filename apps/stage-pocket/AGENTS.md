@@ -53,8 +53,22 @@ The updater compares `versionCode` and the signing certificate.
 
 - Update directory: `D:\AI\airi-updates`
 - Local server: `http://127.0.0.1:9320`
-- Public manifest: `http://airi.example/latest.json`
+- Public manifest: the `VITE_AIRI_UPDATE_MANIFEST_URL` build variable
 - Signing certificate: `9C:64:42:70:...:57:14` (`CN=AIRI Pocket`)
+
+### Build Variables
+
+The repository carries no public host or certificate. The build supplies them:
+
+- `AIRI_PUBLIC_HOST`: host name or IPv4 address for the pinned certificate.
+- `AIRI_PUBLIC_CERT`: path to the PEM certificate for that host.
+- `AIRI_FUNASR_ORIGIN`: origin of the FunASR server for the dev proxy.
+- `VITE_AIRI_UPDATE_MANIFEST_URL`: manifest URL for the APK and bundle updater.
+- `VITE_AIRI_BREEZE_TTS_URL`: Breeze TTS base URL for a fresh install.
+- `VITE_AIRI_FUNASR_URL`: FunASR base URL for the provider default.
+- `VITE_AIRI_QWEN_TOKEN_PLAN_URL`: Qwen token-plan base URL for the provider default.
+
+Without `AIRI_PUBLIC_HOST`, Gradle writes a network config with system anchors only.
 
 ### Update Code
 

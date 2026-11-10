@@ -26,6 +26,73 @@ val androidVersionCode = appVersionProperties.getProperty("AIRI_VERSION_CODE")
     ?.toIntOrNull()
     ?: error("AIRI_VERSION_CODE is missing or invalid in android/app-version.properties")
 
+// The public host and its pinned certificate come from the build environment,
+// so the repository carries neither. Without the variables the app trusts only
+// the system anchors.
+val airiNetworkConfigDir = layout.buildDirectory.dir("generated/airi/res")
+
+val generateAiriNetworkConfig by tasks.registering {
+    val outputDir = airiNetworkConfigDir
+    val publicHost = providers.environmentVariable("AIRI_PUBLIC_HOST").orElse("")
+    val publicCert = providers.environmentVariable("AIRI_PUBLIC_CERT").orElse("")
+
+    inputs.property("publicHost", publicHost)
+    inputs.property("publicCert", publicCert)
+    outputs.dir(outputDir)
+
+    doLast {
+        val root = outputDir.get().asFile
+        root.deleteRecursively()
+        val xmlDir = File(root, "xml").apply { mkdirs() }
+        val rawDir = File(root, "raw").apply { mkdirs() }
+
+        val host = publicHost.get().trim()
+        val cert = publicCert.get().trim()
+        require(host.isEmpty() || host.matches(Regex("^[A-Za-z0-9.-]+$"))) {
+            "AIRI_PUBLIC_HOST must be a host name or an IPv4 address: $host"
+        }
+
+        val pinned = host.isNotEmpty() && cert.isNotEmpty()
+        if (pinned) {
+            val source = file(cert)
+            if (!source.isFile)
+                error("AIRI_PUBLIC_CERT does not point to a file: $cert")
+            source.copyTo(File(rawDir, "airi_cert.pem"), overwrite = true)
+        }
+
+        val domain = if (host.isEmpty()) {
+            ""
+        }
+        else {
+            val anchors = buildString {
+                if (pinned)
+                    appendLine("            <certificates src=\"@raw/airi_cert\" />")
+                appendLine("            <certificates src=\"system\" />")
+            }
+            """
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">$host</domain>
+        <trust-anchors>
+$anchors        </trust-anchors>
+    </domain-config>
+"""
+        }
+
+        File(xmlDir, "network_security_config.xml").writeText(
+            """
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+$domain</network-security-config>
+""".trimStart(),
+        )
+    }
+}
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -67,6 +134,16 @@ android {
         // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
         ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
     }
+
+    sourceSets {
+        getByName("main") {
+            res.srcDir(airiNetworkConfigDir.get().asFile.path)
+        }
+    }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn(generateAiriNetworkConfig)
 }
 
 kotlin {

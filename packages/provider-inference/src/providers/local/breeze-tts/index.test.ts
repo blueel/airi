@@ -19,10 +19,10 @@ async function createProvider(config: Parameters<typeof providerBreezeTts.create
 }
 
 describe('breeze-tts provider', () => {
-  it('defaults to the tunneled server and its single model', async () => {
+  it('defaults to the same-origin proxy path and its single model', async () => {
     const config = z.parse(await providerBreezeTts.createProviderConfig({ t: translate }), {})
 
-    expect(config.baseUrl).toBe('http://airi.example/')
+    expect(config.baseUrl).toBe('/breeze-tts/')
     expect(config.model).toBe('breeze-tts-2')
   })
 
@@ -33,10 +33,10 @@ describe('breeze-tts provider', () => {
   })
 
   it('resolves a proxied path against the page origin', async () => {
-    vi.stubGlobal('location', { origin: 'https://airi.example:9200' })
+    vi.stubGlobal('location', { origin: 'https://airi.example' })
     const provider = await createProvider({ baseUrl: '/breeze-tts/' })
 
-    expect(provider.speech('breeze-tts-2').baseURL).toBe('https://airi.example:9200/breeze-tts/v1/')
+    expect(provider.speech('breeze-tts-2').baseURL).toBe('https://airi.example/breeze-tts/v1/')
   })
 
   it('lists the voices the server reports', async () => {
@@ -112,7 +112,7 @@ describe('breeze-tts provider', () => {
       return new Response(new Uint8Array([1]), { status: 200 })
     })
 
-    const provider = await createProvider()
+    const provider = await createProvider({ baseUrl: 'http://127.0.0.1:9310/' })
     await Promise.all([
       generateSpeech({ ...provider.speech('breeze-tts-2'), input: 'one', voice: 'xiaoling' }),
       generateSpeech({ ...provider.speech('breeze-tts-2'), input: 'two', voice: 'xiaoling' }),

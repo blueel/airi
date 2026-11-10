@@ -149,42 +149,49 @@ export const liveDanmakuProxy: Record<string, ProxyOptions> = {
   },
 }
 
-/**
- * Forwards the frp-tunneled FunASR server through whichever origin serves the
- * app. The tunnel uses a self-signed certificate for airi.example, so a
- * browser that has not trusted it cannot call the HTTPS endpoint directly.
- * This proxy runs in Node and can skip verification while the page keeps a
- * same-origin request. Setting the provider base URL to `/funasr/v1/` selects
- * this route; the public URL remains the default for hosts without a proxy.
- */
-export const funasrProxy: Record<string, ProxyOptions> = {
-  '/funasr': {
-    target: 'https://airi.example',
-    changeOrigin: true,
-    secure: false,
-    rewrite: path => path.replace(/^\/funasr/, ''),
-  },
-}
+const funasrOrigin = process.env.AIRI_FUNASR_ORIGIN?.trim()
+const qwenOrigin = process.env.AIRI_QWEN_PROXY_ORIGIN?.trim()
 
 /**
- * Forwards the local qwen CORS proxy through whichever origin serves the app.
+ * Forwards a FunASR server through whichever origin serves the app.
  *
- * The token-plan gateway (`token-plan.maas.qianwenaiapi.com`) returns no CORS
- * headers at all, and its preflight answers 401, so a WebView rejects every call
- * with `Failed to fetch`. `D:/AI/qwen-proxy/qwen-cors-proxy.mjs` adds the headers
- * upstream of it; this route republishes that proxy on the app's own origin so a
- * phone needs no extra firewall port. Setting the provider base URL to
- * `/qwen/compatible-mode/v1` selects this route.
+ * A self-signed certificate on the server blocks a direct browser call. This
+ * proxy runs in Node and can skip verification while the page keeps a
+ * same-origin request. Setting the provider base URL to `/funasr/v1/` selects
+ * this route. Set `AIRI_FUNASR_ORIGIN` to enable the route.
  */
-export const qwenProxy: Record<string, ProxyOptions> = {
-  '/qwen': {
-    target: 'https://127.0.0.1:9330',
-    changeOrigin: true,
-    // The local proxy reuses the self-signed certificate for the public IP.
-    secure: false,
-    rewrite: path => path.replace(/^\/qwen/, ''),
-  },
-}
+export const funasrProxy: Record<string, ProxyOptions> = funasrOrigin
+  ? {
+      '/funasr': {
+        target: funasrOrigin,
+        changeOrigin: true,
+        secure: false,
+        rewrite: path => path.replace(/^\/funasr/, ''),
+      },
+    }
+  : {}
+
+/**
+ * Forwards a local CORS proxy for the Qwen token-plan gateway through whichever
+ * origin serves the app.
+ *
+ * The gateway (`token-plan.maas.qianwenaiapi.com`) returns no CORS headers, and
+ * its preflight answers 401, so a WebView rejects every call with
+ * `Failed to fetch`. The proxy adds the headers upstream. This route republishes
+ * it on the app's own origin, so a phone needs no extra firewall port. Setting
+ * the provider base URL to `/qwen/compatible-mode/v1` selects this route. Set
+ * `AIRI_QWEN_PROXY_ORIGIN` to enable the route.
+ */
+export const qwenProxy: Record<string, ProxyOptions> = qwenOrigin
+  ? {
+      '/qwen': {
+        target: qwenOrigin,
+        changeOrigin: true,
+        secure: false,
+        rewrite: path => path.replace(/^\/qwen/, ''),
+      },
+    }
+  : {}
 
 export default defineConfig({
   optimizeDeps: {

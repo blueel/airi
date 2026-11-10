@@ -8,11 +8,11 @@ import { createOpenAICompatibleValidators } from '../../../validators'
 import { defineProvider } from '../../registry'
 
 // The upstream gateway (`token-plan.maas.qianwenaiapi.com`) sends no CORS headers,
-// so a browser or WebView cannot call it at all. This default points at the CORS
-// proxy published on the public origin instead: `D:/AI/qwen-proxy/qwen-cors-proxy.mjs`
-// behind the `/qwen` route of the web preview. Callers that do not use a browser
-// can still set this field back to the gateway's own `/compatible-mode/v1`.
-const DEFAULT_BASE_URL = 'https://airi.example/qwen/compatible-mode/v1'
+// so a browser or WebView cannot call it directly. The default is a same-origin
+// proxy path. A build that fronts the gateway with another proxy sets
+// `VITE_AIRI_QWEN_TOKEN_PLAN_URL`, and a caller that needs no proxy sets the
+// gateway's own `/compatible-mode/v1` address in Settings.
+const DEFAULT_BASE_URL = import.meta.env.VITE_AIRI_QWEN_TOKEN_PLAN_URL?.trim() || '/qwen/compatible-mode/v1'
 
 const qwenTokenPlanConfigSchema = z.object({
   apiKey: z

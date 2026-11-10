@@ -55,11 +55,11 @@ describe('providerQwenTokenPlan.createProvider chat options', () => {
     expect(request?.config).toMatchObject({ enable_thinking: false })
   })
 
-  it('defaults the base url to the CORS proxy that fronts the gateway', async () => {
+  it('defaults the base url to the same-origin proxy path', async () => {
     const provider = await createChatProvider()
 
     expect(provider.chat('qwen3.8-max')).toMatchObject({
-      baseURL: 'https://airi.example/qwen/compatible-mode/v1',
+      baseURL: '/qwen/compatible-mode/v1',
     })
   })
 })

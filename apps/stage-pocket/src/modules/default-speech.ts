@@ -1,7 +1,8 @@
 import { errorMessageFrom } from '@moeru/std'
 
 /**
- * Points a fresh Android install at the tunneled Breeze TTS server.
+ * Points a fresh Android install at the Breeze TTS server from
+ * `VITE_AIRI_BREEZE_TTS_URL`.
  *
  * The Web build seeds this through `seedBreezeSpeechProvider`. The Android app
  * has no Vite proxy and no shared seed, so without this file the default speech
@@ -9,15 +10,17 @@ import { errorMessageFrom } from '@moeru/std'
  *
  * The seed fills only missing or placeholder values. A provider the owner chose
  * is left alone, and a loopback address from an older build is rewritten once.
+ * When the build does not set the variable, the seed does nothing.
  */
+const BREEZE_BASE_URL = import.meta.env.VITE_AIRI_BREEZE_TTS_URL?.trim() || ''
+
 const BREEZE = {
   providerId: 'breeze-tts',
   model: 'breeze-tts-2',
   voiceId: 'xiaoling',
-  // The direct frp tunnel is plain HTTP, which Android WebView blocks as mixed
-  // content on the `https://localhost` app origin. The preview origin serves the
-  // same server over HTTPS, and the app already trusts its certificate.
-  baseUrl: 'https://airi.example/breeze-tts/',
+  // The server answers over the origin that serves the app. That origin must
+  // use HTTPS, because an Android WebView blocks mixed content.
+  baseUrl: BREEZE_BASE_URL,
 } as const
 
 const LEGACY_BASE_URLS = new Set([
@@ -25,11 +28,8 @@ const LEGACY_BASE_URLS = new Set([
   'http://127.0.0.1:9310/',
   'http://localhost:9310',
   'http://localhost:9310/',
-  'http://airi.example',
-  'http://airi.example/',
   '/breeze-tts/',
   '/breeze-tts',
-  'https://airi.example/breeze-tts',
 ])
 
 function readObject(key: string) {
@@ -56,6 +56,9 @@ function writeSpeechSelection(provider: string, model: string, voiceId: string) 
 
 export function seedDefaultSpeech() {
   if (typeof localStorage === 'undefined')
+    return
+
+  if (!BREEZE.baseUrl)
     return
 
   try {

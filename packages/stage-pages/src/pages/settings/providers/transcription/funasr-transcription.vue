@@ -26,7 +26,7 @@ interface FunAsrStoredConfig {
 }
 
 const providerId = 'funasr-transcription'
-const DEFAULT_BASE_URL = 'https://airi.example/v1/'
+const DEFAULT_BASE_URL = import.meta.env.VITE_AIRI_FUNASR_URL?.trim() || '/funasr/v1/'
 const MODEL_OPTIONS = [
   { value: 'sensevoice', label: 'SenseVoiceSmall (multilingual, recommended)' },
   { value: 'paraformer-zh', label: 'Paraformer ZH (Mandarin pipeline)' },
