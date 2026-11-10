@@ -2378,6 +2378,9 @@ pages:
           support: 'If the problem continues after you install it, contact us on Discord: {link}'
         description: player2.game
         title: Player2
+      qwen-token-plan:
+        description: token-plan.maas.qianwenaiapi.com
+        title: Qwen Token Plan
       together:
         description: together.ai
         title: Together.ai

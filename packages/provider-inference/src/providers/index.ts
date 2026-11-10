@@ -40,6 +40,7 @@ import { providerOpenPaths } from './cloud/openpaths'
 import { providerOpenRouterAI } from './cloud/openrouter-ai'
 import { providerOpenRouterAudioSpeech } from './cloud/openrouter-audio-speech'
 import { providerPerplexityAI } from './cloud/perplexity-ai'
+import { providerQwenTokenPlan } from './cloud/qwen-token-plan'
 import { providerRuncrate } from './cloud/runcrate'
 import { providerTogetherAI } from './cloud/together-ai'
 import {
@@ -131,6 +132,7 @@ export const portableProviderDefinitions = eraseProviderDefinitions(
   providerOpenRouterAI,
   providerOpenRouterAudioSpeech,
   providerPerplexityAI,
+  providerQwenTokenPlan,
   providerRuncrate,
   providerTogetherAI,
   providerAlibabaCloudModelStudio,
