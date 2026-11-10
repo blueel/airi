@@ -166,6 +166,26 @@ export const funasrProxy: Record<string, ProxyOptions> = {
   },
 }
 
+/**
+ * Forwards the local qwen CORS proxy through whichever origin serves the app.
+ *
+ * The token-plan gateway (`token-plan.maas.qianwenaiapi.com`) returns no CORS
+ * headers at all, and its preflight answers 401, so a WebView rejects every call
+ * with `Failed to fetch`. `D:/AI/qwen-proxy/qwen-cors-proxy.mjs` adds the headers
+ * upstream of it; this route republishes that proxy on the app's own origin so a
+ * phone needs no extra firewall port. Setting the provider base URL to
+ * `/qwen/compatible-mode/v1` selects this route.
+ */
+export const qwenProxy: Record<string, ProxyOptions> = {
+  '/qwen': {
+    target: 'https://127.0.0.1:9330',
+    changeOrigin: true,
+    // The local proxy reuses the self-signed certificate for the public IP.
+    secure: false,
+    rewrite: path => path.replace(/^\/qwen/, ''),
+  },
+}
+
 export default defineConfig({
   optimizeDeps: {
     exclude: [
@@ -205,7 +225,7 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: { ...breezeTtsProxy, ...ollamaProxy, ...strataProxy, ...memoryProxy, ...liveDanmakuProxy, ...funasrProxy },
+    proxy: { ...breezeTtsProxy, ...ollamaProxy, ...strataProxy, ...memoryProxy, ...liveDanmakuProxy, ...funasrProxy, ...qwenProxy },
     fs: {
       // To mute errors like:
       //   The request id ".../node_modules/@fontsource/sniglet/files/sniglet-latin-400-normal.woff" is outside of Vite serving allow list.
