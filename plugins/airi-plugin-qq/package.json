@@ -1,0 +1,23 @@
+{
+  "name": "@proj-airi/airi-plugin-qq",
+  "type": "module",
+  "version": "0.14.1",
+  "private": true,
+  "description": "QQ chat plugin, a bridge that forwards OneBot v11 messages into an AIRI server channel",
+  "scripts": {
+    "start": "tsx --env-file-if-exists=.env src/index.ts",
+    "dev": "tsx --env-file-if-exists=.env src/index.ts",
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@guiiai/logg": "catalog:",
+    "@proj-airi/server-sdk": "workspace:*",
+    "ws": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/ws": "catalog:",
+    "tsx": "catalog:"
+  }
+}
