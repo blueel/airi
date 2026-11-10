@@ -1158,6 +1158,42 @@ pages:
           description: 你让角色建配方时，它会先存成提议，你批准后才生效。
         model_flow: 每次做什么由角色决定
       title: 长期记忆
+      explorer:
+        title: 记忆查询
+        description: 搜索、筛选并查看角色记住的每一条记忆。
+        entry:
+          title: 记忆查询
+          description: 在一个列表里搜索和筛选全部记忆。
+        summary:
+          title: 概览
+          total: 记忆总数
+          pinned: 置顶
+          personas: 角色数
+        chart:
+          title: '最近 {days} 天更新'
+        search:
+          placeholder: 搜索描述与正文
+        filter:
+          all: 全部
+          persona_all: 全部角色
+          pinned_only: 仅置顶
+        sort:
+          updated: 最近
+          importance: 重要度
+        count: '显示 {shown} 条，共 {total} 条'
+        empty:
+          title: 没有匹配的记忆
+          description: 换个关键词，或清空筛选条件。
+          clear: 清空筛选
+        detail:
+          persona: 角色
+          updated: 更新时间
+          created: 创建时间
+          used: 使用次数
+          source: '来源：{source}'
+        backend:
+          local: 本机
+          remote: 来自服务器
     emotion:
       title: 情绪与主动性
       description: 角色会保有自己的心情，并在你安静时主动开启话题。

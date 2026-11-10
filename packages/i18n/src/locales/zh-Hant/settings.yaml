@@ -903,6 +903,42 @@ pages:
     memory-long-term:
       description: 長期記憶
       title: 長期記憶
+      explorer:
+        title: 記憶查詢
+        description: 搜尋、篩選並檢視角色記住的每一條記憶。
+        entry:
+          title: 記憶查詢
+          description: 在一個列表裡搜尋和篩選全部記憶。
+        summary:
+          title: 概覽
+          total: 記憶總數
+          pinned: 置頂
+          personas: 角色數
+        chart:
+          title: '最近 {days} 天更新'
+        search:
+          placeholder: 搜尋描述與正文
+        filter:
+          all: 全部
+          persona_all: 全部角色
+          pinned_only: 僅置頂
+        sort:
+          updated: 最近
+          importance: 重要度
+        count: '顯示 {shown} 條，共 {total} 條'
+        empty:
+          title: 沒有符合的記憶
+          description: 換個關鍵字，或清空篩選條件。
+          clear: 清空篩選
+        detail:
+          persona: 角色
+          updated: 更新時間
+          created: 建立時間
+          used: 使用次數
+          source: '來源：{source}'
+        backend:
+          local: 本機
+          remote: 來自伺服器
     memory-short-term:
       description: 短期記憶
       title: 短期記憶

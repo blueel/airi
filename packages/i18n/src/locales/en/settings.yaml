@@ -1221,6 +1221,42 @@ pages:
           description: A recipe that you ask for is saved as a proposal. It works only after you approve it.
         model_flow: The character decides what each run does
       title: Long-Term Memory
+      explorer:
+        title: Memory explorer
+        description: Search, filter, and read every memory these characters keep.
+        entry:
+          title: Memory explorer
+          description: Search, filter, and read every memory in one list.
+        summary:
+          title: Overview
+          total: Memories
+          pinned: Pinned
+          personas: Characters
+        chart:
+          title: 'Changed in the last {days} days'
+        search:
+          placeholder: Search descriptions and text
+        filter:
+          all: All
+          persona_all: All characters
+          pinned_only: Pinned only
+        sort:
+          updated: Recent
+          importance: Important
+        count: '{shown} of {total} memories'
+        empty:
+          title: No memory matches
+          description: Try another keyword, or clear the filters.
+          clear: Clear filters
+        detail:
+          persona: Character
+          updated: Updated
+          created: Created
+          used: Times used
+          source: 'Source: {source}'
+        backend:
+          local: On this device
+          remote: From the server
     emotion:
       title: Emotion & Proactivity
       description: The character keeps a mood and can start a topic when you are quiet.
