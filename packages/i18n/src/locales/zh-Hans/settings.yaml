@@ -2437,6 +2437,25 @@ pages:
     update:
       title: 应用更新
       description: 从更新服务器检查新版本并安装。
+      bundle:
+        title: 页面热更新
+        description: 只更新网页部分，不用重装 APK。下载完成后在下次启动时生效，启动失败会自动回滚。
+        source-builtin: 随安装包
+        source-downloaded: 热更新 # {id}
+        check: 检查页面更新
+        checking: 检查中...
+        up-to-date: 页面已是最新
+        available: 有页面更新 {version}：{files} 个文件，约 {size}
+        native-required: 这个版本需要先安装新 APK（至少版本号 {version}）。
+        failed-before: 上次更新启动失败，已自动回滚，暂时跳过这个版本。
+        download: 下载页面更新
+        preparing: 正在准备本地文件...
+        downloading: 下载中... {percent}%
+        staged: 已下载，下次启动生效
+        apply: 立即应用并重启
+        auto:
+          label: 自动检查页面更新
+          description: 启动后自动检查，非移动网络时静默下载，下次打开应用生效。
       current-version: 当前版本
       manifest-url: 更新源
       manifest-url-description: latest.json 清单的地址。

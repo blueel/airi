@@ -42,6 +42,16 @@ class AppUpdaterPlugin : Plugin() {
 
     private val executor = Executors.newSingleThreadExecutor()
 
+    private val bundles by lazy { BundleUpdater(context, client) { versionCode() } }
+
+    /**
+     * Runs before Capacitor restores the stored page directory, so a bundle that never came up is dropped before the
+     * WebView loads it.
+     */
+    override fun load() {
+        bundles.guardAtBoot()
+    }
+
     private fun packageInfo() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0))
     }
@@ -254,6 +264,150 @@ class AppUpdaterPlugin : Plugin() {
         }
         catch (error: Exception) {
             call.reject(error.message ?: "Could not start the package installer.", error)
+        }
+    }
+
+    /** Reports which page directory runs: the one in the APK, or a bundle that arrived over the air. */
+    @PluginMethod
+    fun getBundleState(call: PluginCall) {
+        executor.execute {
+            try {
+                call.resolve(bundleStateObject(bundles.state()))
+            }
+            catch (error: Exception) {
+                call.reject(error.message ?: "Could not read the bundle state.", error)
+            }
+        }
+    }
+
+    /**
+     * Compares the signed bundle index on the release tunnel with the files this install has, and reports how much a
+     * sync would download. It changes nothing on disk.
+     */
+    @PluginMethod
+    fun checkBundle(call: PluginCall) {
+        val manifestUrl = call.getString("url")?.trim().orEmpty()
+        if (manifestUrl.isEmpty()) {
+            call.reject("The update manifest URL is empty.")
+            return
+        }
+
+        executor.execute {
+            try {
+                val result = bundles.check(manifestUrl)
+                val latest = JSObject()
+                latest.put("id", result.index.id)
+                latest.put("versionName", result.index.versionName)
+                latest.put("nativeVersion", result.manifest.nativeVersion)
+                latest.put("notes", result.manifest.notes)
+                latest.put("publishedAt", result.manifest.publishedAt)
+                latest.put("size", result.index.totalBytes)
+
+                val plan = JSObject()
+                plan.put("files", result.plan.missing.size)
+                plan.put("bytes", result.plan.bytes)
+                plan.put("total", result.index.files.size)
+
+                val payload = JSObject()
+                payload.put("available", result.reason == BundleUpdater.REASON_AVAILABLE)
+                payload.put("reason", result.reason)
+                payload.put("current", bundleStateObject(bundles.state()))
+                payload.put("latest", latest)
+                payload.put("plan", plan)
+                call.resolve(payload)
+            }
+            catch (error: Exception) {
+                call.reject(error.message ?: "Failed to check for a page update.", error)
+            }
+        }
+    }
+
+    /**
+     * Downloads the missing files into a new directory and stages it. The next start runs it, so an update never
+     * reloads the page under the owner.
+     */
+    @PluginMethod
+    fun syncBundle(call: PluginCall) {
+        val manifestUrl = call.getString("url")?.trim().orEmpty()
+        val id = call.data?.optLong("id", 0L) ?: 0L
+        if (manifestUrl.isEmpty() || id <= 0L) {
+            call.reject("The bundle URL or release id is empty.")
+            return
+        }
+
+        executor.execute {
+            try {
+                val directory = bundles.stage(manifestUrl, id) { received, total, phase ->
+                    notifyBundleProgress(received, total, phase)
+                }
+                val result = JSObject()
+                result.put("id", id)
+                result.put("path", directory.absolutePath)
+                call.resolve(result)
+            }
+            catch (error: Exception) {
+                call.reject(error.message ?: "Failed to download the page update.", error)
+            }
+        }
+    }
+
+    /** Switches to a downloaded bundle now. The page reloads into it. */
+    @PluginMethod
+    fun applyBundle(call: PluginCall) {
+        val id = call.data?.optLong("id", 0L) ?: 0L
+        if (id <= 0L) {
+            call.reject("The release id is empty.")
+            return
+        }
+
+        executor.execute {
+            try {
+                val path = bundles.activate(id)
+                activity?.runOnUiThread {
+                    bridge?.setServerBasePath(path)
+                }
+                call.resolve(JSObject().put("applied", true))
+            }
+            catch (error: Exception) {
+                call.reject(error.message ?: "Failed to apply the page update.", error)
+            }
+        }
+    }
+
+    /**
+     * The page of the running bundle reached its mount point, so the next start keeps it. Without this call the next
+     * start goes back to the bundle before it.
+     */
+    @PluginMethod
+    fun markBundleHealthy(call: PluginCall) {
+        executor.execute {
+            try {
+                bundles.markHealthy()
+                call.resolve()
+            }
+            catch (error: Exception) {
+                call.reject(error.message ?: "Failed to report the page state.", error)
+            }
+        }
+    }
+
+    private fun bundleStateObject(state: BundleUpdater.State): JSObject {
+        val payload = JSObject()
+        payload.put("id", state.id)
+        payload.put("versionName", state.versionName)
+        payload.put("source", state.source)
+        payload.put("basePath", state.basePath)
+        payload.put("pending", state.pending)
+        return payload
+    }
+
+    private fun notifyBundleProgress(received: Long, total: Long, phase: String) {
+        val payload = JSObject()
+        payload.put("received", received)
+        payload.put("total", total)
+        payload.put("phase", phase)
+        activity?.runOnUiThread {
+            notifyListeners("bundleProgress", payload)
         }
     }
 

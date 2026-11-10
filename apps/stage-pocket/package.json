@@ -11,6 +11,7 @@
   "license": "MIT",
   "scripts": {
     "build": "vite build",
+    "bundle-index": "node scripts/make-bundle-index.mjs",
     "lint": "eslint .",
     "lint:swift": "swiftlint ios",
     "preview": "vite preview",

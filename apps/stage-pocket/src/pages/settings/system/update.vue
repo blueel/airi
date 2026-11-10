@@ -12,13 +12,26 @@ import { useI18n } from 'vue-i18n'
 import {
   AppUpdater,
   AUTO_INSTALL_KEY,
-  DEFAULT_UPDATE_MANIFEST_URL,
-  UPDATE_MANIFEST_URL_KEY,
 } from '../../../modules/app-updater'
+import {
+  applyBundleUpdate,
+  autoLiveUpdate,
+  bundleCheck,
+  bundleChecking,
+  bundleError,
+  bundleProgress,
+  bundleStaged,
+  bundleState,
+  bundleSupported,
+  bundleSyncing,
+  checkBundleUpdate,
+  manifestUrl,
+  refreshBundleState,
+  syncBundleUpdate,
+} from '../../../modules/bundle-updater'
 
 const { t } = useI18n()
 
-const manifestUrl = useLocalStorage(UPDATE_MANIFEST_URL_KEY, DEFAULT_UPDATE_MANIFEST_URL)
 const isNative = Capacitor.isNativePlatform()
 const isAndroid = Capacitor.getPlatform() === 'android'
 const autoInstall = useLocalStorage(AUTO_INSTALL_KEY, true)
@@ -55,6 +68,11 @@ onMounted(async () => {
   }
 
   await refreshInstallState()
+
+  if (isAndroid) {
+    void refreshBundleState()
+    void checkBundleUpdate({ quiet: true })
+  }
 })
 
 onUnmounted(async () => {
@@ -67,6 +85,34 @@ const percent = computed(() => {
     return 0
   return Math.min(100, Math.round((progress.value.received / progress.value.total) * 100))
 })
+
+const bundlePercent = computed(() => {
+  if (bundleProgress.value.total <= 0)
+    return bundleProgress.value.phase === 'done' ? 100 : 0
+  return Math.min(100, Math.round((bundleProgress.value.received / bundleProgress.value.total) * 100))
+})
+
+const bundleDownloadSize = computed(() => sizeLabel(bundleCheck.value?.plan.bytes ?? 0))
+
+function sizeLabel(bytes: number) {
+  if (bytes <= 0)
+    return '0 MB'
+  if (bytes < 1024 * 1024)
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+async function checkBundle() {
+  await checkBundleUpdate()
+}
+
+async function downloadBundle() {
+  await syncBundleUpdate()
+}
+
+async function applyBundle() {
+  await applyBundleUpdate()
+}
 
 const downloadedSize = computed(() => {
   if (!downloaded.value)
@@ -303,6 +349,112 @@ function onVisibilityChange() {
           {{ t('settings.pages.system.update.auto-confirm.restricted') }}
         </p>
       </div>
+    </div>
+
+    <div
+      v-if="isAndroid && bundleSupported"
+      :class="['flex flex-col gap-3 rounded-2xl p-4', 'bg-neutral-100/70 dark:bg-neutral-800/60']"
+    >
+      <div :class="['flex items-center justify-between gap-3']">
+        <span :class="['text-sm font-medium']">
+          {{ t('settings.pages.system.update.bundle.title') }}
+        </span>
+        <span :class="['text-xs text-neutral-500 dark:text-neutral-400']">
+          {{ bundleState?.source === 'downloaded'
+            ? t('settings.pages.system.update.bundle.source-downloaded', { id: bundleState?.id })
+            : t('settings.pages.system.update.bundle.source-builtin') }}
+        </span>
+      </div>
+
+      <p :class="['text-xs text-neutral-500 dark:text-neutral-400']">
+        {{ t('settings.pages.system.update.bundle.description') }}
+      </p>
+
+      <label :class="['flex items-start gap-3']">
+        <input v-model="autoLiveUpdate" type="checkbox" :class="['mt-0.5 h-4 w-4']">
+        <span :class="['flex flex-col gap-0.5']">
+          <span :class="['text-sm font-medium']">
+            {{ t('settings.pages.system.update.bundle.auto.label') }}
+          </span>
+          <span :class="['text-xs text-neutral-500 dark:text-neutral-400']">
+            {{ t('settings.pages.system.update.bundle.auto.description') }}
+          </span>
+        </span>
+      </label>
+
+      <button
+        :disabled="bundleChecking || bundleSyncing"
+        :class="[
+          'rounded-xl px-4 py-2.5 text-sm font-medium text-white',
+          'bg-primary-500 active:bg-primary-600 disabled:opacity-50',
+        ]"
+        @click="checkBundle"
+      >
+        {{ bundleChecking ? t('settings.pages.system.update.bundle.checking') : t('settings.pages.system.update.bundle.check') }}
+      </button>
+
+      <div v-if="bundleSyncing" :class="['flex flex-col gap-1']">
+        <div :class="['h-2 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700']">
+          <div
+            :class="['h-full rounded-full bg-primary-500 transition-all']"
+            :style="{ width: `${bundlePercent}%` }"
+          />
+        </div>
+        <span :class="['text-xs text-neutral-500']">
+          {{ bundleProgress.phase === 'prepare'
+            ? t('settings.pages.system.update.bundle.preparing')
+            : t('settings.pages.system.update.bundle.downloading', { percent: bundlePercent }) }}
+        </span>
+      </div>
+
+      <div v-else-if="bundleStaged" :class="['flex flex-col gap-2']">
+        <span :class="['text-sm text-green-600 dark:text-green-400']">
+          {{ t('settings.pages.system.update.bundle.staged') }}
+        </span>
+        <button
+          :class="[
+            'rounded-xl px-4 py-2.5 text-sm font-medium text-white',
+            'bg-primary-500 active:bg-primary-600',
+          ]"
+          @click="applyBundle"
+        >
+          {{ t('settings.pages.system.update.bundle.apply') }}
+        </button>
+      </div>
+
+      <template v-else-if="bundleCheck">
+        <p v-if="bundleCheck.reason === 'up-to-date'" :class="['text-sm text-green-600 dark:text-green-400']">
+          {{ t('settings.pages.system.update.bundle.up-to-date') }}
+        </p>
+        <p v-else-if="bundleCheck.reason === 'native-required'" :class="['text-sm text-amber-600 dark:text-amber-400']">
+          {{ t('settings.pages.system.update.bundle.native-required', { version: bundleCheck.latest.nativeVersion }) }}
+        </p>
+        <p v-else-if="bundleCheck.reason === 'failed-before'" :class="['text-sm text-amber-600 dark:text-amber-400']">
+          {{ t('settings.pages.system.update.bundle.failed-before') }}
+        </p>
+        <template v-else-if="bundleCheck.available">
+          <span :class="['text-sm']">
+            {{ t('settings.pages.system.update.bundle.available', {
+              version: bundleCheck.latest.versionName,
+              files: bundleCheck.plan.files,
+              size: bundleDownloadSize,
+            }) }}
+          </span>
+          <button
+            :class="[
+              'rounded-xl px-4 py-2.5 text-sm font-medium text-white',
+              'bg-primary-500 active:bg-primary-600',
+            ]"
+            @click="downloadBundle"
+          >
+            {{ t('settings.pages.system.update.bundle.download') }}
+          </button>
+        </template>
+      </template>
+
+      <p v-if="bundleError" :class="['text-sm text-red-500']">
+        {{ t('settings.pages.system.update.failed', { message: bundleError }) }}
+      </p>
     </div>
 
     <div

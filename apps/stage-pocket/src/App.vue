@@ -32,6 +32,7 @@ import { toast, Toaster } from 'vue-sonner'
 import OnboardingPermissionsStep from './components/onboarding/step-permissions.vue'
 
 import { installBackgroundReplies } from './modules/background-reply'
+import { installLiveUpdates } from './modules/bundle-updater'
 import { installFloatingAssistantTurns } from './modules/floating-assistant-turns'
 import { getHostWebSocketConnector } from './modules/websocket-bridge'
 import { useFloatingAssistantWakeWordStore } from './stores/floating-assistant-wake-word'
@@ -143,6 +144,7 @@ async function loadStartup() {
 onMounted(() => {
   installFloatingAssistantTurns({ audioContext: audioContextStore, chat: chatStore, chatSession: chatSessionStore })
   installBackgroundReplies()
+  installLiveUpdates()
   void startup.run('route', () => router.isReady()).catch(error => console.error('Initial route failed:', error))
   void loadStartup()
 })

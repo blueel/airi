@@ -2644,6 +2644,25 @@ pages:
     update:
       title: App Update
       description: Check for a new build and install it from your update server.
+      bundle:
+        title: Page hot update
+        description: Updates only the pages, without reinstalling the APK. A downloaded bundle runs on the next start and rolls back if it fails to start.
+        source-builtin: From the APK
+        source-downloaded: Hot update # {id}
+        check: Check page updates
+        checking: Checking...
+        up-to-date: The pages are up to date.
+        available: 'Page update {version}: {files} files, about {size}'
+        native-required: This release needs a newer APK (version code {version} or above).
+        failed-before: The last update failed to start and was rolled back. This release is skipped for now.
+        download: Download page update
+        preparing: Preparing local files...
+        downloading: 'Downloading... {percent}%'
+        staged: Downloaded. It runs on the next start.
+        apply: Apply and restart now
+        auto:
+          label: Check page updates automatically
+          description: Checks after launch, downloads quietly off mobile data, and applies on the next start.
       current-version: Current version
       manifest-url: Update source
       manifest-url-description: Address of the latest.json manifest.
