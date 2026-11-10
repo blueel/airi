@@ -7,10 +7,10 @@ import { defineProvider } from '../../registry'
 
 // NOTICE:
 // The default is a same-origin proxy path. A phone cannot reach a loopback
-// server, and this repository does not ship a public host. A build that
-// serves Breeze-TTS from another origin sets `VITE_AIRI_BREEZE_TTS_URL`.
-// Removal condition: when the app ships a first-run flow that asks for the
-// local server address, restore 'http://127.0.0.1:9310/'.
+// server, and this repository ships no public host. A build that serves
+// Breeze-TTS elsewhere sets `VITE_AIRI_BREEZE_TTS_URL`.
+// Removal: when a first-run flow asks for the server address, restore
+// 'http://127.0.0.1:9310/'.
 const DEFAULT_BASE_URL = import.meta.env.VITE_AIRI_BREEZE_TTS_URL?.trim() || '/breeze-tts/'
 const DEFAULT_MODEL = 'breeze-tts-2'
 const BUSY_RETRIES = 30
